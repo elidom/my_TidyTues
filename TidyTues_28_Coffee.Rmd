@@ -1,0 +1,84 @@
+## Coffee
+
+```{r include=FALSE}
+library(tidyverse)
+library(ggthemes)
+library(wesanderson)
+
+# tuesdata <- tidytuesdayR::tt_load(2020, week = 28) 
+```
+
+```{r}
+coffee_ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-07-07/coffee_ratings.csv')
+
+```
+
+```{r}
+str(coffee_ratings)
+
+profiles <- coffee_ratings %>%
+  select(total_cup_points, species, owner, country_of_origin, region, aroma, flavor, aftertaste, acidity, body, sweetness, balance, uniformity, clean_cup, cupper_points) 
+```
+
+
+Collapsing factors
+```{r}
+coatepec <- c("coatepec", "coatepec, coatepec")
+concordia <- c("la concordia", "la concordia, chiapas")
+
+profiles$region <- factor(profiles$region)
+
+rois <- profiles %>%
+  filter(country_of_origin == "Mexico") %>%
+  mutate(regions_collapsed = fct_collapse(region, Coatepec = coatepec)) %>%
+  mutate(regions_collapsed = fct_collapse(regions_collapsed, La_Concordia = concordia)) %>%
+  filter(regions_collapsed %in% c("Coatepec", "La_Concordia", "pluma hidalogo, oaxaca", "huazalingo, hidalgo", "atoyac de alvarez", "tapachula")) 
+
+rois$regions_collapsed <-  factor(rois$regions_collapsed)
+
+table(rois$regions_collapsed)
+
+```
+
+Profiles of Mexican coffees
+```{r}
+rois_2 <- rois %>%
+  gather("property", "rating", -c(total_cup_points, species, owner, country_of_origin, region, regions_collapsed)) %>%
+  group_by(regions_collapsed, property) %>%
+  summarise(avg_rating = mean(rating), points = mean(total_cup_points)) %>%
+  ungroup() 
+
+pal <- wes_palette("Zissou1", 3, type = "continuous")
+# pal <- wes_palette("Moonrise3", 5, type = "continuous")
+# pal <- wes_palette("Cavalcanti1", 3, type = "continuous")
+
+rois_3 <- rois_2
+rois_3$regions_collapsed <- recode(rois_3$regions_collapsed, "atoyac de alvarez" = "Atoyac de Álvarez", "huazalingo, hidalgo" = "Huazalingo", "La_Concordia" = "La Concordia", "pluma hidalogo, oaxaca" = "Pluma Hidalgo", "tapachula" = "Tapachula")
+
+rois_3$property <-  rois_3$property %>%
+  str_replace_all("cupper_points", "cupper points") %>%
+  str_replace_all("clean_cup", "clean cup")
+
+rois_3 %>%
+  ggplot(aes(factor(property), avg_rating, group = 1)) +
+  geom_polygon(aes(fill = points), alpha = 0.5, color = "black") +
+  coord_polar() +
+  facet_wrap(facets = vars(regions_collapsed)) + 
+  theme_minimal() +
+  scale_fill_gradientn(colours = pal) +
+  scale_y_continuous(limits = c(0, 10)) +
+  labs(title = "Profile of Mexican Coffees from Various Origins", caption = "Source: Coffee Quality Database & James LeDoux;  dataviz: @elidom5") +
+  ylab("Average Rating") +
+  xlab(element_blank()) +
+  labs(subtitle = "According to Professional Graders (Q Graders)") +
+  geom_text(label = 5, x = 2.5, y = 5, size = 3, fontface = "italic", alpha = 0.1, color = "gray22") +
+  geom_text(label = 10, x = 2.5, y = 10, size = 3, fontface = "italic", alpha = 0.1, color = "gray22") +
+  labs(fill = "Average total points") +
+  theme(axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(size = 7),
+        strip.text.x = element_text(size = 10, face = "bold"),
+        plot.title = element_text(size = 20, face = "bold"), 
+        plot.subtitle = element_text(face = "italic")) 
+
+```
