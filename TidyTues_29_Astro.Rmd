@@ -1,0 +1,68 @@
+# Astronauts
+
+### Load Libraries
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(grid)
+```
+
+
+### Import data
+```{r}
+astronauts <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-07-14/astronauts.csv')
+
+```
+
+
+
+### Max mission duration every year
+```{r}
+# # # Cleaning # # # 
+durations <- astronauts %>%
+  select(year_of_mission, hours_mission, mission_title, ascend_shuttle) %>%
+  group_by(year_of_mission) %>%
+  mutate(avg_mission_duration = mean(hours_mission)) %>%
+  filter(hours_mission == max(hours_mission)) %>%
+  ungroup() %>%
+  unique() %>%
+  arrange(year_of_mission) 
+
+# identify repeated data
+durations %>%
+  count(year_of_mission) %>%
+  filter(n > 1)
+
+durations$ascend_shuttle <- str_replace(durations$ascend_shuttle, "Soyuz TMA-9", "Soyuz TMA9")
+
+# remove repeated data
+durations_unique <- durations %>%
+  distinct(year_of_mission, .keep_all = TRUE) %>%
+  distinct(ascend_shuttle, .keep_all = TRUE)
+
+# Graph #
+
+space_theme <- theme_pander() +
+  theme(
+  panel.background = element_rect(fill = "#01103d"),
+  panel.grid = element_line(color = "black"),
+  plot.title = element_text(vjust = -11, hjust = 0.03, color = "#ebcb00", size = 22),
+  plot.subtitle = element_text(vjust = -18, hjust = 0.03, color = "#ebcb00", size = 14, face = "italic")
+)
+
+my_grob <- grid.text("average mission duration", x = 0.83, y = 0.194, gp=gpar(col="#b39e19", fontsize=9, fontface="italic"))
+
+my_grob_2 <- grid.text("Valery Polyakov (launching on Soyuz TM-18)", x = 0.683, y = 0.96, gp=gpar(col="white", fontsize=9, fontface="italic"))
+
+durations_unique %>%
+  ggplot(aes(year_of_mission, hours_mission)) +
+  geom_point(color = "#fffce8", shape = 8, size = 0.4) +
+  geom_smooth(aes(x = year_of_mission, y = avg_mission_duration), se = FALSE, color = "#b39e19", linetype = "dashed", size = 1/2) +
+  xlab("Year") +
+  ylab("Duration (hours)") +
+  labs(title = "The longest space missions", face = "bold", subtitle = "by year (1961 - 2019)") +
+  annotation_custom(my_grob) +
+  annotation_custom(my_grob_2) +
+  space_theme
+```
+
