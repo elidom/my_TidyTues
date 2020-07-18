@@ -44,10 +44,15 @@ durations_unique <- durations %>%
 
 space_theme <- theme_pander() +
   theme(
-  panel.background = element_rect(fill = "#01103d"),
+  panel.background = element_rect(fill = "gray10"),
   panel.grid = element_line(color = "black"),
   plot.title = element_text(vjust = -11, hjust = 0.03, color = "#ebcb00", size = 22),
-  plot.subtitle = element_text(vjust = -18, hjust = 0.03, color = "#ebcb00", size = 14, face = "italic")
+  plot.subtitle = element_text(vjust = -18, hjust = 0.03, color = "#ebcb00", size = 14, face = "italic"),
+  plot.background = element_rect(fill = "gray10"),
+  plot.caption = element_text(color = "white"),
+  axis.text = element_text(color = "white"),
+  axis.title.x = element_text(color = "white"),
+  axis.title.y = element_text(color = "white")
 )
 
 my_grob <- grid.text("average mission duration", x = 0.83, y = 0.194, gp=gpar(col="#b39e19", fontsize=9, fontface="italic"))
@@ -60,9 +65,7 @@ durations_unique %>%
   geom_smooth(aes(x = year_of_mission, y = avg_mission_duration), se = FALSE, color = "#b39e19", linetype = "dashed", size = 1/2) +
   xlab("Year") +
   ylab("Duration (hours)") +
-  labs(title = "The longest space missions", face = "bold", subtitle = "by year (1961 - 2019)") +
+  labs(title = "The longest space missions", face = "bold", subtitle = "by year (1961 - 2019)", caption = "Graphic: @elidom5 | Data: Mariya Stavnichuk and Tatsuya Corlett") +
   annotation_custom(my_grob) +
   annotation_custom(my_grob_2) +
   space_theme
-```
-
