@@ -1,0 +1,100 @@
+---
+title: "TidyTuesday: Animal Outcomes"
+date: 2020-07-21
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+library(ggthemes)
+library(gganimate)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+tt <- tt_load("2020-07-21")
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+tt
+
+```
+
+## Visualize
+```{r}
+animal_outcomes <- tt$animal_outcomes
+
+
+animal_outcomes <- animal_outcomes%>%
+  rename(total = Total) %>%
+  mutate(outcome = fct_recode(outcome, "Currently In Care" = "In Stock")) %>%
+  filter(outcome != "Other")
+
+animal_outcomes$outcome <-  fct_reorder2(animal_outcomes$outcome, animal_outcomes$total,
+                                         animal_outcomes$animal_type)
+
+sum(is.na(animal_outcomes$total))
+which(is.na(animal_outcomes$total))
+animal_outcomes <- animal_outcomes[-c(78, 79),]
+  
+plot <- animal_outcomes %>%
+  ggplot(aes(animal_type, total, fill = outcome)) +
+  geom_col(position = "fill") 
+
+final_plot <- plot +
+  xlab("Animal type") +
+  theme_pander() +
+  labs(title = "Animal outcomes in RSPCA shelters (Australia)", fill = "Outcome", caption = "#TidyTuesday | Data: RSPCA | Graphic: Eliseo Domínguez - @elidom5") +
+  scale_y_continuous(labels = scales::percent) +
+  theme(
+    axis.title.y = element_blank(),
+    panel.background = element_rect(fill = "#21160b"),
+    plot.background = element_rect(fill = "#21160b"),
+    axis.text = element_text(color = "white", size = 14),
+    axis.title.x = element_blank(),
+    legend.background = element_rect(fill = "#21160b"),
+    legend.text = element_text(color = "white", size = 14),
+    legend.title = element_text(color = "white", face = "bold", size = 16), 
+    plot.title = element_text(color = "white", size = 20),
+    plot.subtitle = element_text(color = "white", size = 16),
+    plot.caption = element_text(color = "gray95", hjust = 1.35)
+  ) +
+  scale_fill_manual(values = c("#64a1f4", "#E1F5C4", "#EDE574", "#F9D423", "#FC913A", "#FF4E50")) 
+
+final_plot
+
+anim <- final_plot +
+  transition_states(year, 
+                    transition_length = 3,
+                    state_length = 3) +
+  ease_aes(y = 'cubic-in-out') +
+  labs(subtitle = "Year: {closest_state}") 
+
+animate(anim, duration = 15, height = 600, width = 900)
+
+
+```
+
