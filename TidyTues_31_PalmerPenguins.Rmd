@@ -1,0 +1,214 @@
+---
+title: "palmer Penguins"
+date: 2020-07-28
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(ggcorrplot)
+library(GGally)
+library(cowplot)
+library(ggthemes)
+library(magick)
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2020-07-28")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+penguins <- tt$penguins
+str(penguins)
+
+penguins$species <- as.factor(penguins$species)
+penguins$island <- as.factor(penguins$island)
+penguins$sex <- as.factor(penguins$sex)
+
+plot(penguins)
+
+summary(penguins)
+penguins <- penguins %>% filter(sex == 'male' | sex == 'female')
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+antarctic_theme <- theme(plot.background = element_rect(fill = "#fffdd1"),
+                         panel.background = element_rect(fill = "#fffef2"),
+                         strip.background = element_rect(fill = "#f9ffd0"))
+pCol <- c('#057076', '#ff8301', '#bf5ccb')
+
+plot_A <- penguins %>%
+  pivot_longer(cols = bill_length_mm:body_mass_g,
+               names_to = "metric",
+               values_to = "value") %>%
+  mutate(metric = factor(metric),
+         metric = fct_recode(metric, 
+                             "Bill Depth (mm)" = "bill_depth_mm",
+                             "Bill Length (mm)" = "bill_length_mm",
+                             "Body Mass (g)" = "body_mass_g",
+                             "Flipper Length (mm)" = "flipper_length_mm")) %>%
+  ggplot(aes(value, fill = species)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ metric, scales = "free") +
+  labs(fill = "Species:") +
+  theme_clean() +
+  scale_fill_manual(values = pCol) +
+  theme(plot.background = element_rect(color = "white"),
+        axis.text.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        legend.direction = "horizontal",
+        legend.position = "top",
+        strip.text = element_text(family = "Times", size = 12),
+        legend.background = element_rect(fill = "#fffdd1"),
+        plot.title = element_text(size = 16, family = "Times")
+        )  +
+  antarctic_theme 
+
+plot_A
+
+plot_B <- penguins %>%
+  ggplot(aes(body_mass_g, bill_length_mm, color = species, shape = species)) +
+  geom_point() +
+  geom_smooth(method = "lm", aes(group = species), se = F) +
+  xlab("Body Mass (g)") +
+  ylab("Bill Length (mm)") +
+  labs(caption = "Graphic: Eliseo Domínguez - @elidom5 | Data: Gorman, Williams and Fraser (2014) | #TidyTuesday") +
+  theme_linedraw() +
+  scale_color_manual(values = pCol) +
+  theme(legend.position = "none",
+        axis.text = element_text(family = "Times", size = 12),
+        plot.caption = element_text(family = "Times", color = "gray10", hjust = -0.07)) +
+  antarctic_theme
+
+plot_B
+
+
+
+num_var <- penguins %>%
+  select(bill_depth_mm, bill_length_mm, flipper_length_mm, body_mass_g) 
+
+
+corr <- round(cor(num_var), 2)
+corr
+
+corr_mat <- cor_pmat(num_var)
+corr_mat
+
+names(num_var) <- c("B.Depth", "B.Length", "F.Length", "B.Mass")
+
+plot_D <- ggcorr(num_var, 
+                 geom = "tile",
+                 min_size = 15,
+                 max_size = 35,
+                 size = 5,
+                 high = "#FA8072",
+                 low = "#2ecc71",
+                 legend.position = 0, 
+                 label = TRUE,
+                 label_alpha = TRUE,
+                 angle = 0) +
+  antarctic_theme +
+  labs(title = "The Penguins of Antarctica") +
+  theme(panel.background = element_rect(fill = "#fffdd1"),
+         axis.line = element_blank(),
+        plot.background = element_rect(fill = "#fffdd1"),
+        plot.margin = unit(c(0, 2.5, 0, 2.5), "cm"),
+        strip.text = element_text(family = "Times", size = 12),
+        plot.title =element_text(size = 24, hjust = -0.5, family = "Times", face = "bold"))
+plot_D
+
+
+
+num_var %>%
+  pivot_longer(names_to = "metric",
+               values_to = "values") %>%
+  ggplot(aes(x = metric, y = metric, fill = value)) +
+  geom_tile()
+  
+
+
+```
+
+```{r}
+bottom_row <- plot_grid(plot_B, plot_D)
+
+plot_grid(plot_A, bottom_row, nrow = 2) +
+  theme(plot.background = element_rect(fill = "#fffdd1"),
+        panel.background = element_rect(fill = "#fffdd1")) +
+  draw_image("pics/logo_peng.png", scale = .21, x = 0.14, y = -0.16) 
+
+```
+
+trash
+```{r eval=FALSE}
+
+plot_C <- ggcorrplot(corr, 
+                     method = "square", 
+                     type = "upper",
+                     colors = c("#6D9EC1", "white", "#E46726"),
+                     lab = TRUE,
+                     ggplot2::aes(size = corr),
+                     ggtheme = ggplot2::theme_light,
+                     show.legend = FALSE,
+                     title = "")
+plot_C
+
+num_var%>%
+  correlate()
+```
+
