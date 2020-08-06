@@ -1,0 +1,184 @@
+# European energy
+
+```{r}
+library(tidytuesdayR)
+library(tidyverse)
+library(ggthemes)
+library(ggridges)
+library(tidytext)
+library(ggflags)
+library(extrafont)
+library(scales)
+theme_set(theme_light())
+```
+```{r}
+require(pacman)
+
+p_load("cowplot", "googleway", "ggrepel", "ggspatial", "libwgeom", "sf", "rnaturalearth", "rnaturalearthdata")
+
+# devtools::install_github("rensa/ggflags")
+
+theme_set(theme_bw())
+```
+
+```{r}
+tuesdata <- tt_load(2020, week = 32)
+```
+
+```{r}
+energy_types <- tuesdata$energy_types
+country_totals <- tuesdata$country_totals
+```
+
+
+
+## Europe Map
+```{r}
+energies <- country_totals %>%
+  filter(type == "Total net production") %>%
+  mutate(total = `2016` + `2017` + `2018`) %>%
+  replace_na(list(country_name = "United Kingdom")) %>%
+  select(-c("type", "level", "2016", "2017", "2018")) %>%
+  mutate(total = total/1000000)
+  
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+energy_world <- world %>%
+  full_join(energies, by = c("name" = "country_name"))
+
+europe <- ggplot(data = energy_world) +
+  geom_sf(aes(fill = total)) +
+  coord_sf(xlim = c(-12, 45), ylim = c(34, 70)) +
+  scale_fill_viridis_c(option = "plasma") +
+  labs(title = "Between 2016 and 2018 (Millions of GWh)",subtitle = "Between 2016 and 2018 (Millions of GWh)", fill = "GWh (in millions)", caption = "#TidyTuesday | Data: Eurostat | Visualziation: Eliseo Domínguez - @elidom5") +
+  theme_void() +
+  theme(
+    panel.background = element_rect(fill = "#BAEBFA"),
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    # legend.title = element_text(size = 11, family = "Montserrat", face = "bold"),
+    legend.title = element_blank(),
+    legend.text = element_text(family = "Montserrat"),
+    plot.title = element_text(size = 14, family = "Montserrat", vjust = 0.4,margin=margin(0,0,8,0)),
+    plot.subtitle = element_blank(),
+    plot.caption = element_text(family = "Montserrat", hjust =  0, margin = margin(4,0,3,0))
+    # plot.subtitle = element_text(size = 12, family = "Montserrat")
+  ) 
+
+europe
+```
+
+## ggflag
+```{r}
+energy_types <- energy_types %>%
+  pivot_longer(cols = starts_with("2"),
+               names_to = "year",
+               values_to = "gigawatt_hours") %>%
+  mutate(year = as.integer(year)) %>%
+  replace_na(list(country_name = "United Kingdom")) %>%
+  mutate(country = ifelse(country == "UK", "GB", country),
+         country = ifelse(country == "EL", "GR", country),
+         country = str_to_lower(country))
+
+
+
+energy_clean <- energy_types %>%
+  filter(level == "Level 1") %>%
+  group_by(country, country_name, type) %>%
+  summarise(total = sum(gigawatt_hours)) %>%
+  ungroup() %>%
+  filter(total > 0,
+         type != "Other")
+
+
+
+energy_clean_2 <- energy_clean %>%
+  mutate(
+    country = fct_lump(country, 10, w = total),
+    country_name = fct_lump(country_name, 10, w = total)
+  ) %>%
+  mutate(
+    country_name = reorder_within(country_name, total, type),
+    type = fct_reorder(type, -total, sum)
+  )
+
+```
+Viz:
+```{r}
+energy_clean_2 %>%
+  filter(country != "Other") %>%
+  ggplot(aes(total, country_name)) +
+  geom_col(width = 0.1) +
+  geom_flag(aes(country = country), size = 8) +
+  scale_y_reordered() +
+  facet_wrap(~type, scales = "free") +
+  scale_x_continuous(labels = comma) +
+  scale_country(guide = FALSE) +
+  theme_minimal() +
+  theme(panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank()) 
+
+# I want to group clean energies together and create a plot where the proportion of each is to be seen together.
+
+clean_or_not <- energy_clean_2 %>%
+  filter(country != "Other") %>%
+  mutate(type = fct_collapse(type, Clean = c("Hydro", "Solar", "Geothermal", "Wind", "Nuclear"))) %>%
+  mutate(country_name = gsub("_.*", "", country_name)) %>%
+  group_by(country, country_name, type) %>%
+  summarize(total = sum(total)) %>%
+  mutate(proportion = total/sum(total),
+         clean_prop = proportion[1]) %>%
+  ungroup() %>%
+  mutate(type = ifelse(type == "Clean", "Clean Energy  ", "Conventional Thermal")) %>%
+ggplot(aes(x= reorder(country_name, -clean_prop), fill = type)) +
+  geom_col(aes(y = proportion), width = 0.2) +
+  geom_flag(aes(country = country, y = clean_prop), size = 11) +
+  scale_country(guide = FALSE) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  labs(x = "", y = "") +
+  theme_minimal() +
+  scale_fill_manual(values = c("#F2B5AF", "#939BCB")) +
+  theme(panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 12, family = "Montserrat"),
+        legend.key.width = unit(2, "cm"),
+        axis.text = element_text(size = 11, family = "Montserrat"))
+
+clean_or_not
+```
+
+Cowplot
+```{r}
+
+title <- ggdraw() + 
+  draw_label(
+    "Total Energy Production in European Countries",
+    fontface = 'bold',
+    fontfamily = "Montserrat",
+    size = 20,
+    x = 0,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+
+row_grid <- plot_grid(europe, clean_or_not, ncol = 2)
+
+plot_grid(
+  title, row_grid,
+  ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.1, 1)
+) +
+  theme(plot.background = element_rect(fill = "#FEF3D8"))
+
+  # plot_grid(europe, clean_or_not, ncol = 2) +
+  # theme(plot.background = element_rect(fill = "#FEF3D8"))
+```
+
