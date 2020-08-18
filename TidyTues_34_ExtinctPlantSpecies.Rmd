@@ -1,0 +1,300 @@
+---
+title: "TidyTemplate"
+date: 2020-08-17
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(here)
+require(pacman)
+
+p_load("cowplot", "googleway", "ggrepel", "ggspatial", "libwgeom", "sf", "rnaturalearth", "rnaturalearthdata")
+
+theme_set(theme_bw())
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2020-08-18")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+plants <- tt$plants 
+
+america_plants <- plants %>%
+  filter(continent %in% c("North America", "South America"),
+         country != "United States",
+         country != "Canada") %>%
+  group_by(country) %>%
+  count() %>%
+  ungroup
+
+threats <- tt$threats %>%
+  filter(continent %in% c("North America", "South America"),
+         country != "United States",
+         country != "Canada")
+
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+plants_map <- world %>%
+  full_join(america_plants, by = c("name" = "country"))
+
+```
+
+
+# Visualize
+
+```{r Visualize}
+# Latin America Map
+LA_plants <- ggplot(data = plants_map) +
+  geom_sf(aes(fill = n)) +
+  coord_sf(xlim = c(-120, -35), ylim = c(-55, 30)) +
+  scale_fill_gradient2(
+  low = "#b18c2e",
+  mid = "#87ae62",
+  high = "#436a2d",
+  midpoint = 15,
+  na.value = "#aabcaf"
+) +
+  guides(fill = guide_colourbar(title.position = "top"))+
+  labs(fill = "Number of extinct plant species in Latin America  ") +
+  theme_void() +
+  theme(
+    legend.direction = "horizontal",
+    legend.position = c(0.35, 1.07),
+    legend.title = element_text(family = "Futura Classic", size = 19),
+    legend.key.width = unit(3, "cm"),
+    legend.title.align = 0,
+    legend.text = element_text(size = 9, family = "Times"),
+    plot.margin = unit(c(3, 7, 0, 7), "cm"),
+    plot.title = element_text(size = 16, family = "Futura Times", face = "bold", vjust = -1)
+  ) 
+
+LA_plants
+ 
+```
+
+
+#### Themes
+```{r}
+# pal <- wes_palette(name = "Darjeeling1", n = 2, type = "discrete")
+pal <- c("#e4d2a0", "#c96504")
+
+vegetation <- theme(
+  plot.background = element_rect(fill = "#aabcaf", linetype = 0),
+  panel.background = element_rect(fill = "#aabcaf"),
+  axis.text.x =  element_text(family = "Futura Classic", size = 12, face = "bold"),
+)
+```
+
+###Tile Plots
+```{r}
+tiles_1 <- threats %>%
+  filter(binomial_name == "Gossypium armourianum") %>%
+  mutate(threat_type = factor(threat_type)) %>%
+  ggplot(aes(binomial_name, threat_type, fill = threatened)) +
+  geom_tile(color = "black") +
+  scale_fill_gradientn(colors = pal) +
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.y = element_blank()
+  ) +
+  vegetation
+
+
+tiles_toromiro <- threats %>%
+  filter(binomial_name == "Sophora toromiro") %>%
+  ggplot(aes(binomial_name, threat_type, fill = threatened)) +
+  geom_tile(color = "black") +
+  scale_fill_gradientn(colors = pal) +
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.y = element_blank()
+  ) +
+  vegetation
+
+
+
+tiles_brugmansia <- threats %>%
+  filter(binomial_name == "Brugmansia vulcanicola") %>%
+  ggplot(aes(binomial_name, threat_type, fill = threatened)) +
+  geom_tile(color = "black") +
+  scale_fill_gradientn(colors = pal) +
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.y = element_blank()
+  ) +
+  vegetation
+
+
+
+tiles_proliferans <- threats %>%
+  filter(binomial_name == "Discocactus subterraneo-proliferans") %>%
+  ggplot(aes(binomial_name, threat_type, fill = threatened)) +
+  geom_tile(color = "black") +
+  scale_fill_gradientn(colors = pal) +
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.y = element_blank()
+  ) +
+  vegetation
+
+tiles_insignis <- threats %>% 
+  filter(binomial_name == "Brugmansia insignis") %>%
+  ggplot(aes(binomial_name, threat_type, fill = threatened)) +
+  geom_tile(color = "black") +
+  scale_fill_gradientn(colors = pal) +
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.y = element_blank()
+  ) +
+  vegetation
+
+```
+
+#### Tile plots key
+```{r}
+tiles.key <- threats %>%
+  filter(binomial_name == "Sophora toromiro") %>%
+  ggplot(aes(binomial_name, threat_type)) +
+  geom_tile(color = "black", fill = "#e4d2a0") +
+  scale_fill_gradientn(colors = pal) +
+  labs(title = "Threat types") +
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(family = "Futura Classic", size = 11)
+  ) +
+  vegetation +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.title = element_text(family = "Futura Classic", size = 11, face = "bold", hjust = 1.66)
+        )
+
+```
+
+### Main Plot
+```{r Visualize}
+ggdraw() +
+  draw_plot(LA_plants)  +
+  draw_image(here("pics", "algodon_2.png"), scale = .25, x = -0.34, y = 0.35) +
+  draw_plot(tiles_1, x = 0.074, y = 0.67, height = 0.3, width = 0.03) +
+  draw_line(
+    x= c(0.37, 0.18),
+    y = c(0.8, 0.8),
+    linetype = 2
+    ) +
+  draw_image(here("pics", "toromiro.png"), scale = .25, x = -0.26, y = -0.3) +
+  draw_plot(tiles_toromiro, x = 0.10, y = 0.035, height = 0.3, width = 0.03) +
+  draw_line(
+    x = c(0.53, 0.29),
+    y = c(0.3, 0.2),
+    linetype = 2
+  ) +
+  draw_plot(tiles.key, x = 0.83, y = 0.02, height = 0.3, width = 0.149) +
+  draw_image(here("pics", "brugmansia_2.png"), scale = .25, x = 0.17, y = 0.33) +
+  draw_plot(tiles_brugmansia, x = 0.73, y = 0.685, height = 0.3, width = 0.03) +
+  draw_line(
+    x = c(0.57, 0.64),
+    y = c(0.64, 0.74),
+    linetype = 2
+  ) +
+  draw_image(here("pics", "proliferans.png"), scale = 0.18, x = 0.325, y = 0.045) +
+  draw_plot(tiles_proliferans, x = 0.885, y = 0.395, height = 0.3, width = 0.03) +
+  draw_line(
+    x = c(0.666, 0.765),
+    y = c(0.48, 0.515),
+    linetype = 2
+  ) +
+  draw_image(here("pics", "insignis_2.png"), scale = 0.29, x = -0.15, y = 0.04) +
+  draw_plot(tiles_insignis, x = 0.28, y = 0.415, height = 0.3, width = 0.03) +
+  draw_line(
+    x = c(0.5, 0.386),
+    y = c(0.50, 0.57),
+    linetype = 2
+  ) +
+  theme(
+    panel.background = element_rect(fill = "#aabcaf")
+  ) +
+  draw_label(
+    label = "Those depicted are considered extinct in the wild, 
+i.e. the last living members are kept in captivity",
+    size = 12,
+    fontface = "italic",
+    fontfamily = "Futura Classic",
+    x = 0.885,
+    y = 0.98
+  )
+
+
+# ggsave("graph_progress/figure%03d.png", width = 20, height = 10, units = "cm") 
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave(
+  filename = "My TidyTuesday Plot.png",
+  device = "png")
+
+```
