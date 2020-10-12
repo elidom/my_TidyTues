@@ -1,0 +1,279 @@
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width = 12,fig.height = 11)
+```
+
+# Datos de Covid en México
+### Elaboración: Eliseo Domínguez
+
+### Cargar paquetes
+```{r message=FALSE}
+library(tidyverse)
+library(ggthemes)
+library(here)
+library(janitor)
+library(extrafont)
+library(cowplot)
+library(lubridate)
+library(scales)
+theme_set(theme_light())
+```
+
+A continuación se hará una exploración de algunos aspectos generales sobre las-lamentables-defunciones de pacientes de covid ingresados a las unidades de atención médica.
+En particular me interesa explorar dos aspectos:  
+
+1) La edad promedio de los pacientes que fallecieron, así como el detalle de los grupos formados por los pacientes con distintas comorbilidades.  
+
+2) Cómo ha cambiado la proporción de pacientes fallecidos a lo largo de la contingencia.   
+
+
+### Cargar datos
+```{r}
+covid <- read_csv(here("data", "covid", "mex_covid_201007.csv")) %>%
+  clean_names()
+
+# covid %>% View()
+```
+
+
+### Filtrar y ordenar datos
+```{r}
+
+condiciones = c("diabetes", "epoc", "asma", "inmusupr", "hipertension", "otra_com", "cardiovascular", "obesidad", "renal_cronica", "tabaquismo")
+
+keep <- c("id_registro", "entidad_um", "edad", "sexo", "condicion", "presenta", "fecha_ingreso", "fecha_def", "intubado")
+
+tidy_covid <- covid %>%
+  filter(!is.na(fecha_def),
+         embarazo %in% c(2, 97)) %>%
+  pivot_longer(cols = all_of(condiciones),
+               names_to = "condicion",
+               values_to = "presenta") %>% 
+  filter(presenta != 98,
+         presenta != 97) %>%
+  select(all_of(keep)) %>%
+  mutate(presenta = ifelse(presenta == 1, TRUE, FALSE),
+         sexo = factor(sexo, levels = c(1, 2, 99), labels = c("mujer", "hombre", "no_especificado")),
+         intubado = factor(intubado, levels = c(1, 2, 97, 99), labels = c("si", "no", "no_aplica", "no_especificado"))) 
+
+wide_covid <- tidy_covid %>%
+  pivot_wider(names_from = condicion, 
+              values_from = presenta,
+              values_fill = FALSE) %>%
+  mutate(sin_comorbilidad = diabetes + epoc + asma + inmusupr + hipertension + otra_com + cardiovascular + obesidad + renal_cronica + tabaquismo,
+         sin_comorbilidad = ifelse(sin_comorbilidad > 0, FALSE, TRUE))
+
+
+long_covid <- wide_covid %>%
+  pivot_longer(cols = all_of(c(condiciones, "sin_comorbilidad")),
+               names_to = "condicion",
+               values_to = "presenta")
+
+# View(long_covid)
+```
+
+### Elaborar gráfica con edades promedio
+```{r}
+
+edad_promedio <- mean(tidy_covid$edad)
+
+
+long_covid %>%
+  filter(presenta == TRUE) %>%
+  group_by(condicion) %>%
+  summarise(edad_avg = mean(edad)) %>%
+  ungroup() %>%
+  ggplot(aes(x = reorder(condicion, edad_avg), 
+             y = edad_avg)) +
+  geom_segment(aes(x = reorder(condicion, edad_avg), 
+                   y = edad_promedio, 
+                   yend = edad_avg, 
+                   xend = condicion)) +
+  geom_point(stat = 'identity',
+             fill = "black",
+             size = 10) +
+  geom_text(color = "white", 
+            size = 6,
+            aes(label = round(edad_avg))) +
+  coord_flip()
+
+```
+Esta es la visualización que esperaba. Sin embargo, mi predicción era que las personas sin comorbilidades tendrían un promedio más alto que las personas con comorbilidades. Probablemente esto se deba a que las personas mayores casi invariabemente tienen una comorbilidad.  
+
+Pero también podría ser que las personas más jóvenes que han muerto no han tenido commorbilidades lo cual sesga esta categoría hacia la izquierda.  
+
+Para averiguarlo, podría ser buena idea agregar barra de error para reflejar esto.  
+
+```{r}
+long_covid_2 <- long_covid %>%
+  filter(presenta == TRUE) %>%
+  group_by(condicion) %>%
+  mutate(desviacion_estandar = sd(edad)) %>%
+  summarise(edad_avg = mean(edad), desv_est = mean(desviacion_estandar)) %>%
+  mutate(tipo = ifelse(edad_avg < edad_promedio, "menor", "mayor")) %>%
+  ungroup() 
+
+
+long_covid_2$min <- long_covid_2$edad_avg + (long_covid_2$tipo=='mayor')*long_covid_2$desv_est
+
+long_covid_2$max <- long_covid_2$edad_avg - (long_covid_2$tipo=='menor')*long_covid_2$desv_est
+
+long_covid_2  %>%
+  ggplot(aes(x = reorder(condicion, edad_avg), 
+             y = edad_avg)) +
+  geom_segment(aes(x = reorder(condicion, edad_avg), 
+                   y = edad_promedio, 
+                   yend = edad_avg, 
+                   xend = condicion)) +
+  geom_point(stat = 'identity',
+             fill = "black",
+             size = 10) +
+  geom_text(color = "white", 
+            size = 6,
+            aes(label = round(edad_avg))) +
+  geom_errorbar(aes(ymin=min, ymax=max),
+                width = 0.2,
+                alpha = 0.2) +
+  coord_flip()
+```
+Así descubrimos que el grupo sin comorbilidades no varía particularmente más que los demás.   
+Como la variabilidad tiende a ser muchísima, esta gráfica es poco amigable. Así que me apegaré a la versión pasada para la elaboración de la versión final.  
+
+
+### Estetizar la gráfica  
+```{r}
+ 
+labs <-labs(title = "Edad promedio de personas que han fallecido por covid", 
+       subtitle = "Promedio general: 62.1 años", 
+       x = "Condición", 
+       y = "Edad promedio") 
+
+dorado <- "#decaa4"
+rojito <- "#a0203f"
+crema <- "#fffefa"
+gris <- "#70726e"
+gris_oscuro <- "#656665"
+
+secretaria_de_salud <- theme(
+  plot.background = element_rect(fill = crema),
+  panel.background = element_rect(fill = crema),
+  panel.grid = element_line(color = gris),
+  axis.line.x = element_line(color = gris),
+  axis.line.y = element_line(color = gris),
+  axis.text = element_text(color = gris, family = "Futura", size = 12),
+  axis.title = element_text(color = gris_oscuro, family = "Futura", size = 14),
+  plot.title = element_text(color = gris_oscuro, family = "Futura", size = 18),
+  plot.subtitle = element_text(color = gris, family = "Futura", size = 15)
+)
+
+condiciones_plot <- long_covid %>%
+  filter(presenta == TRUE) %>%
+  group_by(condicion) %>%
+  summarise(edad_avg = mean(edad)) %>%
+  ungroup() %>%
+  mutate(condicion = fct_recode(condicion,
+    Epoc = "epoc",
+    Cardiovascular = "cardiovascular",
+    Hipertensión = "hipertension",
+    Diabetes = "diabetes",
+    Tabaquismo = "tabaquismo",
+    `Otra complicación` = "otra_com",
+    `Insuficiencia renal` = "renal_cronica",
+    Asma = "asma",
+    `Sin comorbilidad` = "sin_comorbilidad",
+    Obesidad = "obesidad",
+    Inmunosupresión = "inmusupr"
+  )) %>%
+  ggplot(aes(x = reorder(condicion, edad_avg), 
+             y = edad_avg)) +
+  geom_segment(aes(x = reorder(condicion, edad_avg), 
+                   y = edad_promedio, 
+                   yend = edad_avg, 
+                   xend = condicion),
+               color = rojito) +
+  geom_point(stat = 'identity',
+             color = rojito,
+             size = 10) +
+  geom_text(color = crema, 
+            size = 6,
+            aes(label = round(edad_avg))) +
+  coord_flip() +
+  theme_clean() +
+  labs +
+  secretaria_de_salud +
+  geom_hline(yintercept = edad_promedio,     # Agregar línea vertical al promedio general
+             color = gris)   
+
+condiciones_plot
+```
+
+Ahora voy a elaborar la segunda gráfica, acerca de cómo ha cambiado la proporción de fallecimientos en las unidades de atención médica a lo largo del tiempo.  
+
+### Ordenar datos
+```{r}
+# str(long_covid)
+
+prop_def <- covid %>%
+  mutate(def = ifelse(is.na(fecha_def), 0, 1)) %>%
+  group_by(fecha_ingreso) %>%
+  summarise(prop = mean(def))
+```
+
+### Graficar
+```{r}
+prop_def %>%
+  ggplot(aes(x = fecha_ingreso, y = prop)) +
+  geom_line()
+```
+Hay una fluctuación misteriosa. Para entenderla mejor voy a examinar algunas semanas individualmente:  
+```{r}
+prop_def %>%
+  filter(fecha_ingreso > as.Date("2020-05-20"),
+         fecha_ingreso < as.Date("2020-05-29")) %>%
+  ggplot(aes(x = fecha_ingreso, y = prop)) +
+  geom_line()
+```
+Al parecer hay una tendencia: los picos observados en la gráfica anterior son los domingos, lo cual puede reflejar un aspecto del método de resgistro en las unidades médicas. Para resolver esto en la visualización, optaré por agrupar los datos semanalmente.  
+```{r}
+prop_def <- covid %>%
+  mutate(def = ifelse(is.na(fecha_def), 0, 1),
+         semanal = floor_date(fecha_ingreso, unit = "week")) %>%
+  group_by(semanal) %>%
+  summarise(prop = mean(def))
+
+prop_plot <- prop_def %>%
+  filter(semanal < as.Date("2020-09-27")) %>%
+  ggplot(aes(x = semanal, y = prop)) +
+  geom_line(color = rojito)
+
+prop_plot
+```
+Esta gráfica refleja mejor la tendencia. Probablemente el pico se encuentra en el momento en el que más estuvieron saturados los hospitales. Esto podría apoyar el supuesto de que la saturación hospitalaria es peligrosa, en el sentido de que la atención que se les puede proveer a los pacientes que la necesitan es menor.  
+
+Ahora toca darle estilo a la gráfica:  
+```{r}
+labs_2 <- labs(
+  x = "",
+  y = "% de personas ingresadas que fallecieron",
+  title = "Proporción de fallecimientos en las unidades de atención médica",
+  subtitle = "por semana"
+)
+
+tiempo_plot <- prop_plot +
+  labs_2 +
+  scale_y_continuous(labels = label_percent(accuracy = 0.1)) +
+  scale_x_date(labels = date_format("%b"), breaks = "1 month") +
+  theme_clean() +
+  secretaria_de_salud
+
+tiempo_plot
+```
+
+
+
+```{r, fig.width = 12,fig.height = 14, warning=FALSE}
+plot_grid(condiciones_plot, tiempo_plot, cols = 1)
+```
+
+
