@@ -1,0 +1,180 @@
+---
+title: "TidyTemplate"
+date: 2020-10-13
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(gganimate)
+library(magick)
+library(cowplot)
+```
+
+# Load the weekly Data
+
+```{r Load}
+
+tt <- tt_load("2020-10-13")
+
+cat <- read_csv("data/cat.csv", col_names = FALSE)
+
+```
+
+
+# Readme
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+
+```{r Wrangle}
+
+datasaurus <- tt$datasaurus
+
+names(cat) <- c("x", "y")
+ds <- rep("cat", 163)
+length(cat$x)
+
+cat_dataset <- cbind(ds, cat)
+names(cat_dataset)[1] <- "dataset"
+names(cat_dataset)
+catasaurus <- rbind(datasaurus, cat_dataset)
+
+head(catasaurus)
+
+
+```
+```{r}
+
+
+
+stats = catasaurus %>%
+  group_by(dataset) %>%
+  summarise(mean_x = mean(x, na.rm = T),
+            mean_y = mean(y, na.rm = T),
+            sd_x   =   sd(x, na.rm = T),
+            sd_y   =   sd(y, na.rm = T),
+            coeff  = cor(y, x))
+ 
+```
+
+
+```{r}
+create_colash <- function(ds, col){
+  fig_1 <- catasaurus %>%
+    filter(dataset == ds) %>%
+    ggplot(aes(x, y)) +
+    geom_point(color = col,
+               size = 2) +
+    labs(x = "", y = "") +
+    theme_classic() +
+    theme(
+      axis.text = element_text(size = 11, family = "mono"),
+      panel.grid.major.x  = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      plot.background = element_rect(fill = "#fdfdfd", linetype = 0),
+      panel.background = element_rect(fill = "#fdfdfd", linetype = 0)
+    )
+  
+  fig_2 <- catasaurus %>%
+  left_join(stats) %>%
+  filter(dataset == ds) %>%
+  mutate(dataset = str_replace_all(dataset, "_", " "),
+         dataset = str_to_title(dataset)) %>%
+  ggplot() + 
+  geom_text(x = 50, y = 50, hjust = 1, vjust = 0.5, size = 5, family = "mono",
+             aes(label = paste0(dataset,
+                                "\nMean x = ",
+                                "\nMean y = ",
+                                "\nSD x = ",
+                                "\nSD y = ",
+                                "\nCorr. = "
+                                )), check_overlap = T, color = "black") +
+  geom_text(x = 50, y = 50, hjust = 0, vjust = 0.5, size = 5, family = "mono",
+            aes(label = paste0(" ",
+                               "\n", trunc(mean_x * 10)/10,
+                               "\n", trunc(mean_y * 10)/10,
+                               "\n", trunc(sd_x * 10)/10,
+                               "\n", trunc(sd_y * 10)/10,
+                               "\n", trunc(coeff * 100)/100
+            )), check_overlap = T, color = "black") +
+  theme_void() + 
+  theme(plot.background = element_rect(fill = "#fdfdfd", linetype = 0),
+      panel.background = element_rect(fill = "#fdfdfd", linetype = 0)) +
+  xlim(40, 55) + ylim(40, 55)
+  
+  fig_complete <- plot_grid(fig_1, fig_2, ncol = 1)
+  return(fig_complete)
+}
+
+create_colash("cat", "dark green")
+
+table(catasaurus$dataset)
+
+dss <- c("away", "bullseye", "dino", "star", "wide_lines", "x_shape", "circle", "cat", "slant_up", "v_lines", "high_lines", "dots")
+
+colors <- c("#ecd6ad", "#67b9e9", "#7caa7b", "#512f2e", "#8f8093", "#496a71", "#485e73", "#c56873", "#988786", "#c2a389", "#67b9e9", "#7caa7b")
+
+
+for (i in 1:length(dss)) {
+  varb <- dss[i]
+  colr <- colors[i]
+  figure <- create_colash(varb, colr)
+  assign(paste("fig_", varb, sep = ""), figure)
+}
+
+final_colash <- plot_grid(fig_away,
+          fig_bullseye,
+          fig_dino,
+          fig_circle,
+          fig_dots,
+          fig_cat,
+          fig_high_lines,
+          fig_slant_up, 
+          fig_star,
+          fig_v_lines,
+          fig_wide_lines,
+          fig_x_shape,
+          nrow = 3)
+
+ggdraw()+
+  draw_plot(final_colash, width = 1, height = 0.93) +
+  draw_text("The Anscombosaurus & Friends (& Cat)",
+            x = 0.4,
+            y = 0.96,
+            size = 22,
+            family = "mono") +
+  theme(
+    panel.background = element_rect(fill = "#fdfdfd"),
+    plot.background = element_rect(fill = "#fdfdfd")
+  )
+
+```
