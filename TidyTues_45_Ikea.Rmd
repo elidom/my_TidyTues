@@ -1,0 +1,165 @@
+---
+title: "TidyTemplate"
+date: 2020-11-02
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+library(cowplot)
+library(extrafont)
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2020-11-03")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+ikea <- tt$ikea %>%
+  select(item_id:old_price) %>%
+  mutate(item_id = factor(item_id),
+         category = factor(category),
+         old_price = ifelse(old_price == "No old price", NA, old_price)) %>%
+  separate(old_price, c("cur", "old_price"), sep = " ") %>%
+  select(-cur) 
+
+ikea_clean <- ikea %>%
+  mutate(old_price = as.numeric(gsub(",", "",ikea$old_price))) %>%
+  drop_na() %>%
+  mutate(price_diff = old_price - price,
+         prop_diff = price_diff / old_price)
+
+ikea_meds <- ikea_clean %>%
+  group_by(category) %>%
+  summarise(n = n(), current = median(price), sd_cur = IQR(price), diff = median(price_diff), sd_df = IQR(price_diff), prp_df = median(prop_diff)) %>%
+  mutate(sd_cur = ifelse(is.na(sd_cur), 0, sd_cur),
+         sd_df = ifelse(is.na(sd_df), 0, sd_df))
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+mytheme <- theme(
+  axis.title = element_text(family = "Sawasdee", size = 12),
+  axis.text = element_text(family = "Sawasdee", size = 10, color = "gray35"),
+  plot.caption = element_text(family = "Sawasdee", size = 8),
+  legend.text = element_text(family = "Sawasdee", size = 9),
+  axis.line = element_line(color = "gray35"),
+  panel.grid.major.y = element_line(color = "gray89")
+)
+
+ylab <- rep(1:8)
+
+raw_scatter <- ikea_clean %>%
+  ggplot(aes(x = prop_diff, y = price, color = category)) +
+  geom_point(size = 2, alpha = 0.7) +
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1", 17, "continuous")) +
+  scale_x_continuous(labels = label_percent(accuracy = 1)) +
+  scale_y_continuous(labels = paste0(ylab, "K"),
+                     breaks = 10e2 * ylab) +
+  labs(x = "Proportion of change in price", y = "Current price (Saudi Riyals)") +
+  theme_classic() +
+  mytheme +
+  theme(
+    legend.position = "none"
+  )
+
+ylab <- c(0.5, 1.0, 1.5, 2.0)
+
+median_plot <- ikea_meds %>%
+  ggplot(aes(x = prp_df, y = current, size = n, color = category)) +
+  geom_point(alpha = 0.7) +
+  scale_size(range = c(2, 14)) +
+  scale_color_manual(values = wesanderson::wes_palette("Darjeeling1", 17, "continuous")) +
+  scale_x_continuous(labels = label_percent(accuracy = 1)) +
+  scale_y_continuous(labels = paste0(ylab, "K"),
+                     breaks = 10e2 * ylab,
+                     limits = c(0, 2500)) +
+  guides(size = FALSE) +
+  labs(x = "", 
+       y = "Current price (median)",
+       color = "",
+       caption = "#TidyTuesday | Source: IKEA | graphic: @elidomx") +
+  theme_classic() +
+  mytheme +
+  theme(
+    plot.caption = element_text(hjust = 1.7)
+  )
+
+
+complete <- plot_grid(raw_scatter, median_plot, ncol = 2, align = "h", rel_widths = c(1.43,2))
+
+ggdraw() +
+  draw_plot(complete, height = 0.93) +
+  draw_text("The prices of IKEA products have decreased since their launch",
+            x = 0.5, y = 0.96,
+            size = 30,
+            family = "Sawasdee",
+            color = "gray10")
+
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave(
+  filename = "My TidyTuesday Plot.png",
+  device = "png")
+
+```
