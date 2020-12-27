@@ -1,0 +1,163 @@
+---
+title: "The Big Mac Index"
+date: 2020-12-22
+output: html_output
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(cowplot)
+```
+
+
+```{r Load}
+
+tt <- tt_load("2020-12-22")
+mapping <- read_csv(here::here("data", "mapglyphs-mapping.csv"))
+```
+
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+
+```{r Wrangle}
+bigmac <- tt$`big-mac`
+
+# Are currencies repeated?
+bigmac %>%
+  group_by(date) %>%
+  count(currency_code) %>%
+  summarise(amount = max(n))
+  # No.
+```
+
+
+```{r}
+new_bigmac <- bigmac %>%
+  add_count(name, name = "country_total") %>%
+  filter(country_total == max(country_total),
+         !is.na(usd_adjusted),
+         name != "United States") %>%
+  group_by(name) %>%
+  mutate(currency_devaluation = dollar_ex[1]/dollar_ex,
+         usd_raw = usd_raw + 1,
+         usd_adjusted = usd_adjusted + 1,
+         index_devaluation = usd_adjusted[1]/usd_adjusted) %>%
+  ungroup() %>%
+  mutate(
+         country = case_when(
+      name == "Euro area" ~ "Europe",
+      name == "Britain" ~ "United Kingdom",
+      TRUE ~ name)) %>%
+  left_join(mapping)
+```
+
+
+```{r}
+correlations_raw <- new_bigmac %>%
+  group_by(country) %>%
+  summarise(corr = cor(currency_devaluation, usd_raw))
+
+```
+
+```{r}
+my_theme <- theme(
+  plot.title = element_text(family = "Futura Classic"),
+  axis.title = element_text(family = "Futura Classic"),
+  axis.text = element_text(family = "Futura Classic"),
+  panel.background = element_rect(linetype = 0),
+  plot.background = element_rect(linetype = 0))
+```
+
+
+```{r}
+create_image_raw_data <- function(x) {
+
+  figure <- new_bigmac %>%
+    filter(country == as.character(x)) %>%
+    ggplot(aes(x = date, y = currency_devaluation)) +
+    geom_text(aes(label = icon, x = mean(date)), y = 0.85, size = 34, color = "gray50", alpha = 0.5, family = "MapGlyphs") +
+    geom_abline(slope = 0, intercept = 1, color = "gray30", alpha = 0.75) +
+    geom_line(aes(y = currency_devaluation, group = country), color = "#DC143C") +
+    geom_line(aes(y = usd_raw, group = country), color = "#0000CD") +
+    labs(title = paste(as.character(x), "-", "Correlation:" ,as.character(round(correlations_raw[correlations_raw$country == x, 2], digits=  2))), x = "", y = "") +
+    scale_y_continuous(limits = c(0,2)) +
+    theme_minimal_hgrid() +
+    my_theme
+
+return(figure)
+  
+}
+```
+
+```{r}
+country_list <- as.vector(correlations_raw$country)
+
+```
+
+```{r}
+for (i in 1:length(country_list)) {
+  image <- create_image_raw_data(country_list[i])
+  assign(paste("fig_", as.character(country_list[i]), sep = ""), image)
+}
+```
+
+
+```{r}
+final_colash <- plot_grid(`fig_United Kingdom`,
+          fig_Europe,
+          fig_Mexico,
+          fig_Chile,
+          fig_Japan,
+          fig_Canada,
+          fig_Argentina,
+          fig_Switzerland,
+          `fig_South Korea`,
+          fig_Singapore,
+          fig_China,
+          fig_Thailand,
+          ncol = 3) +
+  panel_border(remove = TRUE)
+
+ggdraw()+
+  draw_plot(final_colash, width = 1, height = 0.85) +
+  draw_text("The Big Mac Index and Currency Fluctuations",
+            hjust = 0,
+            x = 0.01,
+            y = 0.96,
+            size = 29,
+            family = "Futura Classic") +
+  draw_text("Graphs represent how local currency (red) has fluctuated with respect to itself, how the country's \n Big Mac index has fluctuated (according to the Big Mac price in USD; blue) and how these correlate.",
+            hjust = 0,
+            x = 0.01,
+            y = 0.90,
+            size = 17, 
+            family = "Futura Classic") +
+  draw_text("Graph: @elidomx | Source: The Economist | Icons: MapGlyphs | #TidyTuesday",
+            x = 0.77,
+            y = 0.01,
+            size = 12,
+            family = "Futura Classic") +
+  theme(
+    panel.background = element_rect(fill = "#fdfdfd"),
+    plot.background = element_rect(fill = "#fdfdfd")
+  )
+```
+
+
