@@ -1,0 +1,139 @@
+---
+title: "DuBois Challenge"
+date: "`r Sys.Date()`"
+author: "Marcos Eliseo Domínguez Arriola"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=FALSE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(cowplot)
+library(extrafont)
+
+theme_set(theme_light())
+```
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load(2021, week = 8)
+freed <- tuesdata$freed_slaves %>%
+  clean_names() %>%
+  mutate(year = factor(year),
+         pos = ifelse(free != 100, slave, 90))
+```
+
+
+```{r}
+free_plot <- freed %>%
+  ggplot(aes(x = year, y = slave, group = 1)) +
+  geom_line() +
+  geom_area(fill = "gray11") +
+  scale_y_continuous(limits = c(0,100), expand = c(0,0)) +
+  scale_x_discrete(expand = c(0,0), position = "top") +
+  geom_text(aes(y = pos + 2, label = paste0(free, "%")), 
+            vjust = 0,
+            family = "Karumbi",
+            size = 9) +
+  coord_cartesian(clip = "off") +
+  theme(
+    panel.background = element_rect(fill = "#4f7851"),
+    plot.background = element_rect(fill = "#ddd5c8", linetype = 0),
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(color = "gray20"),
+    panel.border = element_rect(fill = "transparent"),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(family = "teko", size = 13, face = "bold", color = "black"),
+    axis.title = element_blank()
+  ) 
+  
+final_plot <- ggdraw() +
+  draw_plot(free_plot,
+            width = 0.94,
+            height = 0.77,
+            halign = 0.5,
+            y = 0.025,
+            hjust = 0.5,
+            x = 0.5) +
+  draw_text("PROPORTION OF FREEMEN AND SLAVES AMONG AMERICAN NEGROES .",
+            x = 0.5,
+            y = 0.96,
+            family = "mono",
+            size = 12,
+            fontface = "bold") +
+  draw_text("PROPORTION DES NÈGRES LIBRES ET DES ESCLAVES EN AMÉRIQUE .",
+            x = 0.5,
+            y = 0.90,
+            family = "mono",
+            size = 12,
+            fontface = "bold") +
+  draw_text("DONE BY ATLANTA UNIVERSITY .",
+            x = 0.5,
+            y = 0.84,
+            family = "mono",
+            size = 9,
+            fontface = "bold") +
+  draw_text("#DuBoisChallenge #TidyTuesday | Viz: @elidomx .",
+            x = 0.02,
+            y = 0.01,
+            family = "mono",
+            size = 6,
+            fontface = "bold",
+            hjust = 0,
+            vjust = 0) +
+  draw_text("SLAVES",
+            x = 0.49,
+            y = 0.48,
+            family = "teko",
+            size = 21,
+            color = "white") +
+  draw_text("ESCLAVES",
+            x = 0.49,
+            y = 0.44,
+            family = "teko",
+            size = 21,
+            color = "white") +
+  draw_text("FREE - LIBRE",
+            x = 0.49,
+            y = 0.74,
+            family = "teko",
+            size = 15,
+            color = "black",
+            fontface = "bold") +
+  theme(
+    panel.background = element_rect(fill = "#ddd5c8"),
+    plot.background = element_rect(fill = "#ddd5c8")
+  )
+```
+
+
+```{r, fig.width=6.8, fig.height=9, message=TRUE}
+final_plot
+```
+
+
+```{r}
+# ggsave("week_8/duBois.png", final_plot, width = 6.8, heigh = 9)
+```
+
