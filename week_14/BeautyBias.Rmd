@@ -1,0 +1,204 @@
+---
+title: "BeautyBias"
+date: "`r Sys.Date()`"
+author: "@elidomx"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=FALSE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(cowplot)
+library(extrafont)
+library(tidytuesdayR)
+theme_set(theme_light())
+```
+
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load(2021, week = 14)
+
+allcat <- tuesdata$allCategories
+
+```
+
+```{r}
+allcat %>%
+  filter(str_detect(name, "natural")) %>% 
+  ggplot(aes(x = lightness, y = 1, color = hex)) +
+  geom_jitter() +
+  scale_colour_identity() +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  ) 
+```
+
+## All shades
+```{r}
+all_shades <- allcat %>%
+  ggplot(aes(x = reorder(hex, lightness), y = 1, fill = hex)) +
+  geom_tile() +
+  scale_fill_identity() +
+  theme_minimal() +
+  labs(y = "", x = "") +
+  geom_text(x = 0.5, 
+            y = 1.54, 
+            label = "All Shades",
+            family = "Uroob", 
+            size = 7 , 
+            vjust = 0,
+            color = "gray92") +
+  coord_polar() +
+  theme(
+    legend.position = "none",
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    plot.title = element_text(family = "Times New Roman", size = 14)
+  )
+```
+
+
+### Make it a function
+```{r}
+do_graph <- function(term){ 
+  plott <- 
+    allcat %>%
+    filter(str_detect(name, term)) %>% 
+    ggplot(aes(x = reorder(hex, lightness), y = 1, fill = hex)) +
+    geom_tile() + 
+    scale_fill_identity() +
+    theme_minimal() +
+    labs(y = "", x = "") +
+    coord_polar() +
+    geom_text(x = 0.5, 
+              y = 1.54, 
+              label = str_to_title(term),
+              family = "Uroob", 
+              size = 7 , 
+              vjust = 0,
+              color = "gray92") +
+    theme(
+      legend.position = "none",
+      panel.grid = element_blank(),
+      axis.text = element_blank(),
+      plot.title.position = "panel"
+      #plot.title = element_text(family = "KacstTitleL", size = 16, hjust = 0.5, vjust = 0)
+  )
+  
+  return(plott)
+}
+```
+
+
+###  Do graphs
+```{r}
+(natural <- do_graph("natural"))
+nude <- do_graph("nude")
+neutral <- do_graph("neutral")
+medium <- do_graph("medium")
+```
+
+### Together
+#### Dummy
+```{r}
+few_shades <- do_graph("naked")
+```
+
+```{r warning=FALSE}
+plot_1 <- ggdraw() +
+  draw_plot(all_shades,
+            x = 0.5, y = 0.5,
+            hjust = 0.5, vjust = 0.5,
+            scale = 0.8) +
+  draw_plot(natural,
+            x = 0.2, y = 0.22,
+            hjust = 0.5, vjust = 0.5,
+            scale = 0.5) +
+  draw_plot(nude,
+            x = 0.82, y = 0.75,
+            hjust = 0.5, vjust = 0.5,
+            scale = 0.5) +
+  draw_plot(neutral,
+            x = 0.2, y = 0.75,
+            hjust = 0.5, vjust = 0.5,
+            scale = 0.5) +
+  draw_plot(medium,
+            x = 0.82, y = 0.22,
+            hjust = 0.5, vjust = 0.5,
+            scale = 0.5) +
+  theme(
+    plot.background = element_rect(fill = "gray14",
+                                   linetype = 0)
+  )
+
+final_plot <- ggdraw() +
+  draw_plot(plot_1, height = 0.9) +
+  draw_text(str_to_title("What does the makeup industry mean by... (foundation shades)"),
+            size = 28,
+            hjust = 0, vjust = 1,
+            x = 0.02,
+            family = "Uroob",
+            y = 0.98,
+            color = "gray92") +
+  draw_text("Graphic: @elidomx | #TidyTuesday | Data: The Pudding",
+            size = 9,
+            hjust = 1, vjust = 0,
+            x = 0.98, y = 0.01,
+            color = "gray92",
+            family = "Uroob") +
+  draw_text("Or how 'beauty' is biased...",
+            size = 18,
+            hjust = 0, vjust = 0,
+            x = 0.02, y = 0.01,
+            color = "gray92",
+            family = "Uroob") +
+  theme(plot.background = element_rect("gray14"))
+
+```
+
+```{r}
+ggsave("week_14/BeautyBias.png", final_plot, width = 30, heigh = 20, units = "cm")
+```
+
+
+#### trash
+
+
+```{r}
+allcat %>%
+  filter(str_detect(name, "natural")) %>% 
+  ggplot(aes(x = reorder(hex, lightness), y = 1, fill = hex)) +
+  geom_tile() +
+  scale_fill_identity() +
+  theme_minimal() +
+  labs(y = "", x = "Lightness", title = "Shades with the term Natural") +
+  coord_polar() +
+  theme(
+    legend.position = "none",
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    plot.title = element_text(family = "Times New Roman", size = 14)
+  )
+```
