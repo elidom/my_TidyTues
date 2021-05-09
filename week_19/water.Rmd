@@ -1,3 +1,12 @@
+---
+title: "Water Sources"
+date: "`r Sys.Date()`"
+author: "@elidomx"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
 
 ```{r setup, echo=FALSE, cache=FALSE}
 library(knitr)
@@ -7,19 +16,17 @@ library(rmdformats)
 options(max.print="75")
 opts_chunk$set(echo=TRUE,
 	             cache=TRUE,
-               prompt=FALSE,
+               prompt=TRUE,
                tidy=FALSE,
                comment=NA,
-               message=FALSE,
+               message=TRUE,
                warning=FALSE)
 opts_knit$set(width=75)
 ```
-# Water sources
+# Water sources in Africa
 
 ## Load Libraries & Data
 
-
-## Load Libraries and Data
 ```{r}
 library(tidyverse)
 library(janitor)
@@ -82,6 +89,7 @@ clean_water %>%
   borders("world") +  # Wow, this is actually a ggplot function
   theme(legend.position = 'none')
 ```
+
 Let's improve that
 
 ```{r}
@@ -117,23 +125,23 @@ clean_water %>%
 
 Check lat and lon:
 ```{r}
-clean_water %>%
-  filter(country == "Tanzania") %>%
-  ggplot(aes(lon, lat)) +
-  borders("world", regions = "Tanzania") +
-  geom_point(size = .1, alpha = 0.25) 
+# clean_water %>%
+  # filter(country == "Tanzania") %>%
+  # ggplot(aes(lon, lat)) +
+  # borders("world", regions = "Tanzania") +
+  # geom_point(size = .1, alpha = 0.25) 
 
-clean_water %>%
-  filter(country == "Ethiopia",
-         between(lat, 2, 15),
-         between(lon, 32, 50)) %>%
-  ggplot(aes(lon, lat)) +
-  borders("world", regions = "Ethiopia") +
-  geom_point(size = .1, alpha = 0.25) 
+# clean_water %>%
+  # filter(country == "Ethiopia",
+         # between(lat, 2, 15),
+         # between(lon, 32, 50)) %>%
+  # ggplot(aes(lon, lat)) +
+  # borders("world", regions = "Ethiopia") +
+  # geom_point(size = .1, alpha = 0.25) 
 ```
 
 
-Function:
+### Create a Function:
 ```{r}
 country_map_noLegend <- function(name, lat1, lat2, long1, long2, text_adjust_x = 0.5, text_adjust_y = 0.1){
   g <- clean_water %>%
@@ -193,6 +201,8 @@ country_map_yesLegend <- function(name, lat1, lat2, long1, long2, text_adjust_x 
   return(g)
 }
 ```
+
+#### Create plots for individual countries
 ```{r}
 ug <- country_map_noLegend("Uganda", -1.5, 4, 28, 40, 1.4, 0.2)
 ni <- country_map_noLegend("Nigeria", 4, 14, 0, 18, 2.2, 0.2)
@@ -209,7 +219,7 @@ p1 <- plot_grid(ug, ni, sl, li, et, ta,
           nrow = 3)
 ```
 
-### Continent
+## Continent plot
 ```{r}
 water_counts <- clean_water %>%
   filter(status_id == "Yes") %>%
@@ -251,11 +261,11 @@ Continent
 ```
 
 
-# Join Plots
+## Final Plot
 ```{r}
 p2 <- plot_grid(p1, Continent, nrow = 1, rel_widths = c(1,1))
 
-ggdraw() +
+p3 <- ggdraw() +
   draw_plot(p2, height = 0.9) +
   draw_text(str_to_title("How are the identified water sources in Africa distributed?"),
             size = 42,
@@ -266,12 +276,15 @@ ggdraw() +
             color = "gray10") +
   draw_text("Graphic: @elidomx | #TidyTuesday | Data: WPDX",
             size = 11,
-            hjust = 1, vjust = 0,
-            x = 0.99, y = 0.01,
+            hjust = 0.5, vjust = 0,
+            x = 0.4, y = 0.01,
             color = "gray10",
             family = "Uroob") +
   theme(plot.background = element_rect("#E1E5EA"))
+
 ```
 
-
+```{r}
+# ggsave("week_19/Water_Sources_Africa.png", p3, width = 33, heigh = 20, units = "cm")
+```
 
