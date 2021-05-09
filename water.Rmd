@@ -1,0 +1,277 @@
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=FALSE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+# Water sources
+
+## Load Libraries & Data
+
+
+## Load Libraries and Data
+```{r}
+library(tidyverse)
+library(janitor)
+library(cowplot)
+library(extrafont)
+library(scales)
+library(maps)
+library(countrycode)
+library(lubridate)
+theme_set(theme_light())
+```
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load(2021, week = 19)
+
+water <- tuesdata$water
+```
+
+```{r}
+glimpse(water)
+
+table(water$country_name)
+```
+
+## Tidy + Wrangle
+```{r}
+clean_water <- water %>%
+  mutate(report_date = mdy(report_date),
+         status_id = factor(status_id, levels = c("y", "n", "u"), labels = c("Yes", "No", "Unknown"))) %>%
+  rename(lat = lat_deg,
+         lon = lon_deg,
+         country = country_name) %>%
+  separate(water_tech, c("water_tech", "brand"), sep = " - ", fill = "right") %>%
+  mutate(install_year = ifelse(install_year > 2021, NA_real_, install_year)) %>% # Since NA alone is logical it forced the second one to be the same; with NA_real_ this does not happen. Another solution could have been to flip the order.
+  filter(!country %in% c("Peru", "Dominical Republic", "Timor-Leste"),
+         !is.na(country)) %>%
+  filter(between(lat, -35, 37),
+         between(lon, -40, 60))
+```
+
+explore...
+```{r}
+clean_water %>%
+  filter(install_year > 1980) %>%
+  count(install_year) %>%
+  ggplot(aes(x = install_year, y = n)) +
+  geom_col()
+```
+
+```{r}
+water %>%
+  count(status_id, status, sort = TRUE)
+```
+
+### Map
+```{r}
+clean_water %>%
+  count(country) %>%
+  ggplot(aes(lon, lat, fill = n)) +
+  borders("world") +  # Wow, this is actually a ggplot function
+  theme(legend.position = 'none')
+```
+Let's improve that
+
+```{r}
+library(ggthemes)
+
+africa_map_data <- map_data("world") %>%
+  as_tibble() %>%
+  mutate(continent = countrycode(region, "country.name", "continent")) %>%
+  filter(continent == "Africa")
+
+clean_water %>%
+  sample_n(10000) %>%
+  ggplot(aes(lon, lat)) +
+  geom_polygon(aes(long, lat, group = group),
+               color = "gray",
+               fill = "white",
+               data = africa_map_data) +
+  geom_point(size = .1, alpha = 0.25) +
+  theme_map()
+
+```
+
+### Uganda:
+```{r}
+clean_water %>%
+  filter(country == "Uganda",
+         between(lat, -2, 4),
+         between(lon, 28, 40)) %>%
+  ggplot(aes(lon, lat)) +
+  borders("world", regions = "Uganda") +
+  geom_point(size = .1, alpha = 0.25) 
+```
+
+Check lat and lon:
+```{r}
+clean_water %>%
+  filter(country == "Tanzania") %>%
+  ggplot(aes(lon, lat)) +
+  borders("world", regions = "Tanzania") +
+  geom_point(size = .1, alpha = 0.25) 
+
+clean_water %>%
+  filter(country == "Ethiopia",
+         between(lat, 2, 15),
+         between(lon, 32, 50)) %>%
+  ggplot(aes(lon, lat)) +
+  borders("world", regions = "Ethiopia") +
+  geom_point(size = .1, alpha = 0.25) 
+```
+
+
+Function:
+```{r}
+country_map_noLegend <- function(name, lat1, lat2, long1, long2, text_adjust_x = 0.5, text_adjust_y = 0.1){
+  g <- clean_water %>%
+  filter(country == name,
+         between(lat, lat1, lat2),
+         between(lon, long1, long2)) %>%
+    ggplot(aes(lon, lat, color = status_id)) +
+    borders("world", regions = name, fill = "#F6E6CB") +
+    geom_point(size = .2, alpha = .2) +
+    theme_map() +
+    geom_text(label = as.character(name),
+              x = long1 + text_adjust_x,
+              y = lat2 - text_adjust_y,
+              family = "Uroob",
+              color = "gray28",
+              alpha = 0.2,
+              size = 14,
+              hjust = 0
+              ) +
+    scale_color_manual(values = c("#1CC5DC", "#CF0000", "#890596")) +
+    theme(
+      legend.position = "none"
+    )
+  
+  return(g)
+}
+
+country_map_noLegend("Sierra Leone", 8, 10, -14, -10)
+
+country_map_yesLegend <- function(name, lat1, lat2, long1, long2, text_adjust_x = 0.5, text_adjust_y = 0.1){
+  g <- clean_water %>%
+  filter(country == name,
+         between(lat, lat1, lat2),
+         between(lon, long1, long2)) %>%
+    ggplot(aes(lon, lat, color = status_id)) +
+    borders("world", regions = name, fill = "#F6E6CB") +
+    geom_point(size = .2, alpha = .2) +
+    theme_map() +
+    geom_text(label = as.character(name),
+              x = long1 + text_adjust_x,
+              y = lat2 - text_adjust_y,
+              family = "Uroob",
+              color = "gray28",
+              alpha = 0.2,
+              size = 14,
+              hjust = 0
+              ) +
+    scale_color_manual(values = c("#1CC5DC", "#CF0000", "#890596"), 
+                       guide = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+    labs(color = "Is it working?") +
+    theme(
+      legend.title = element_text(family = "Uroob", size = 22, color = "gray15"),
+      legend.text = element_text(family = "Uroob", size = 16, color = "gray15"),
+      legend.background = element_rect(fill = "transparent"),
+      legend.box.background = element_blank())
+  
+  return(g)
+}
+```
+```{r}
+ug <- country_map_noLegend("Uganda", -1.5, 4, 28, 40, 1.4, 0.2)
+ni <- country_map_noLegend("Nigeria", 4, 14, 0, 18, 2.2, 0.2)
+sl <- country_map_noLegend("Sierra Leone", 8, 10, -14, -10, 0.6, 0.15)
+li <- country_map_noLegend("Liberia", 4, 9, -12, -7, 0.5, 0.5)
+et <- country_map_yesLegend("Ethiopia", 2, 15, 32, 50, 0.6, 0.3)
+ta <- country_map_noLegend("Tanzania", -12, -4, 29, 41, 0.5, -2.6)
+```
+
+
+### Combine plots
+```{r}
+p1 <- plot_grid(ug, ni, sl, li, et, ta,
+          nrow = 3)
+```
+
+### Continent
+```{r}
+water_counts <- clean_water %>%
+  filter(status_id == "Yes") %>%
+  count(country)
+
+africa_map_data_2 <- map_data("world") %>%
+  as_tibble() %>%
+  mutate(continent = countrycode(region, "country.name", "continent")) %>%
+  filter(continent == "Africa") %>%
+  left_join(water_counts, by = c("region" = "country"))
+
+Continent <- africa_map_data_2 %>%
+  filter(lat > -45) %>%
+  ggplot(aes(long, lat)) +
+  geom_polygon(aes(long, lat, group = group, fill = n),
+               color = "gray") +
+  geom_point(size = .1, alpha = 0.25) +
+  theme_map() +
+  guides(fill = guide_colorbar(title.position = "top")) +
+  labs(fill = "Number of identified functioning water sources") +
+  scale_fill_gradient2(high = "#CF0000",
+                       low = "#1CC5DC",
+                       mid = "#890596",
+                       na.value = "#F5F7B2",
+                       midpoint = 50000) +
+  theme(
+    legend.position = "bottom",
+    legend.justification = "center",
+    legend.key.width = unit(3.5, "cm"),
+    legend.title = element_text(family = "Uroob",
+                                size = 20),
+    legend.title.align = 0.5,
+    legend.text = element_text(family = "Uroob",
+                               size = 10),
+    legend.background = element_rect(fill = "#E1E5EA")
+  ) 
+
+Continent
+```
+
+
+# Join Plots
+```{r}
+p2 <- plot_grid(p1, Continent, nrow = 1, rel_widths = c(1,1))
+
+ggdraw() +
+  draw_plot(p2, height = 0.9) +
+  draw_text(str_to_title("How are the identified water sources in Africa distributed?"),
+            size = 42,
+            hjust = 0.5, vjust = 1,
+            x = 0.5,
+            family = "Uroob",
+            y = 0.98,
+            color = "gray10") +
+  draw_text("Graphic: @elidomx | #TidyTuesday | Data: WPDX",
+            size = 11,
+            hjust = 1, vjust = 0,
+            x = 0.99, y = 0.01,
+            color = "gray10",
+            family = "Uroob") +
+  theme(plot.background = element_rect("#E1E5EA"))
+```
+
+
+
