@@ -1,0 +1,206 @@
+# Ask a Manager
+
+## Load libraries & data
+```{r}
+library(tidyverse)
+library(scales)
+library(cowplot)
+library(here)
+library(broom)
+library(ggridges)
+library(viridis)
+library(forcats)
+library(hrbrthemes)
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 21)
+
+theme_set(theme_light())
+```
+
+## Wrangle & Tidy
+```{r}
+survey <- 
+tuesdata$survey %>%
+  select(-c(additional_context_on_job_title, 
+            additional_context_on_income, 
+            other_monetary_comp, 
+            timestamp,currency_other, 
+            state)) %>%
+  mutate(how_old_are_you = factor(how_old_are_you),
+         industry = factor(industry),
+         currency = factor(currency),
+         country = factor(country),
+         city = factor(city),
+         overall_years_of_professional_experience = factor(overall_years_of_professional_experience),
+         years_of_experience_in_field = factor(years_of_experience_in_field),
+         highest_level_of_education_completed = factor(highest_level_of_education_completed),
+         gender = factor(gender),
+         race = factor(race)) 
+
+glimpse(survey)
+table(survey$currency)
+
+
+survey_dls <- 
+  survey %>%
+  mutate(annual_salary_dls = case_when(
+    currency == 'GBP' ~ annual_salary * 1.42,
+    currency == 'CAD' ~ annual_salary * 0.83,
+    currency == 'AUD/NZD' ~ annual_salary * 0.78,
+    currency == 'EUR' ~ annual_salary * 1.22,
+    currency == 'USD' ~ annual_salary,
+    TRUE ~ NA_real_
+  )) 
+
+survey_clean <- survey_dls %>%
+  mutate(industry_lumped = fct_lump_n(industry, n=  26)) %>%
+  filter(!is.na(industry_lumped),
+         !is.na(annual_salary_dls),
+         annual_salary_dls < 2e5)
+
+medians <- survey_clean %>%
+  group_by(industry) %>%
+  transmute(median_salary = median(annual_salary_dls)) 
+
+med_sal <- median(survey_clean$annual_salary_dls)
+```
+
+
+## Visualize
+
+### Salary by industry
+```{r}
+p1 <- survey_clean %>%
+  ggplot(aes(x = annual_salary_dls,
+             y = reorder(industry_lumped, annual_salary_dls),
+             fill = ..x..)) +
+  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
+  scale_fill_viridis(option = "C") +
+  geom_vline(xintercept = med_sal, alpha = 0.4) +
+  annotate("text",
+           label = "overall median salary", 
+            x = med_sal, hjust = 0,
+            y = "Retail", vjust = 1,
+           size = 4, family = "Futura Classic",
+           alpha = 0.4) +
+  labs(title = "", x = "Annual Salary (USD)", y = "") +
+  theme(
+    legend.position = "none",
+    axis.text = element_text(family = "Futura Classic"),
+    axis.title = element_text(family = "Futura Classic"),
+    plot.title = element_text(family = "Futura Classic"),
+    panel.background = element_rect(fill = "#fff0ff"),
+    plot.background = element_rect(fill = "#f0f0ff", linetype = 0)
+  )
+
+p1
+```
+
+
+### raincloud plots of gender, education and race ?
+```{r}
+library(raincloudplots)
+library(wesanderson)
+
+source("https://gist.githubusercontent.com/benmarwick/2a1bb0133ff568cbe28d/raw/fb53bd97121f7f9ce947837ef1a4c65a73bffb3f/geom_flat_violin.R")
+
+pal <- wes_palette("Darjeeling1", 4, "discrete")
+
+raincloud_theme <- theme(
+  text = element_text(size = 10, family = "Futura Classic"),
+  axis.title.y = element_text(size = 12, family = "Futura Classic"),
+  #axis.text = element_text(size = 16, family = "Times New Roman"),
+  axis.text.x = element_text(size = 11, family = "Futura Classic"),
+  #legend.title = element_text(size = 16, family = "Times New Roman"),
+  #legend.text = element_text(size = 22, family = "Times New Roman"),
+  #legend.position = "right",
+  #plot.title = element_text(lineheight = .8, face = "bold", size = 16, family = "Times New Roman"),
+  panel.border = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.grid.major = element_blank(),
+  axis.line.x = element_line(colour = "black", size = 0.5, linetype = "solid"),
+  axis.line.y = element_line(colour = "black", size = 0.5, linetype = "solid"),
+  legend.position = "none",
+  plot.title.position = "plot",
+  panel.background = element_rect(fill = "#fff0ff"),
+  plot.background = element_rect(fill = "#f0f0ff", linetype = 0))
+
+p2 <- survey_clean %>%
+  filter(gender %in% c("Man", "Woman", "Non-binary", "Other or prefer not to answer")) %>%
+  ggplot(aes(y = annual_salary_dls, 
+      x = reorder(gender, -annual_salary_dls),
+      fill = gender)) +
+  geom_flat_violin(position = position_nudge(x = .2, y = 0), alpha = .8) +
+  geom_point(aes(color = gender), position = position_jitter(width = 0.15), alpha = 0.4) +
+  geom_boxplot(width = .1, outlier.shape = 2, alpha = 0.5, outlier.alpha = 0.2) +
+  labs(title = "", x = "", y = "Annual Salary (USD)") +
+  scale_fill_manual(values = pal) +
+  scale_color_manual(values = pal) +
+  theme_bw() +
+  raincloud_theme
+
+p2
+```
+
+```{r}
+pal <- wes_palette("Darjeeling2", 4, "discrete")
+pal_2 <- wes_palette("Darjeeling1", 2, "discrete")
+pal_3 <- append(pal, pal_2)
+
+p3 <- survey_clean %>%
+  filter(!is.na(highest_level_of_education_completed)) %>%
+  ggplot(aes(y = annual_salary_dls,
+             x = reorder(highest_level_of_education_completed, -annual_salary_dls),
+             fill = highest_level_of_education_completed)) +
+  geom_flat_violin(position = position_nudge(x = .2, y = 0), alpha = .8) +
+  geom_point(aes(color = highest_level_of_education_completed), 
+             position = position_jitter(width = 0.15), 
+             alpha = 0.4) +
+  geom_boxplot(width = .1, 
+               outlier.shape = 2, 
+               alpha = 0.5, 
+               outlier.alpha = 0.2) +
+  labs(title = "", 
+       x = "", y = "Annual Salary (USD)") +
+  scale_fill_manual(values = pal_3) +
+  scale_color_manual(values = pal_3) +
+  theme_bw() +
+  raincloud_theme
+
+p3
+```
+
+
+# Join plots
+```{r}
+p_2_3 <- plot_grid(p2, p3, nrow = 1, rel_widths = c(4,6))
+
+p_123 <- plot_grid(p1, p_2_3, nrow = 2)
+
+final_plot <- 
+  ggdraw() +
+  draw_plot(p_123, height = 0.95) +
+  draw_text(str_to_title("Annual Salary of 'Ask a Manager' Readers by Industry, Gender & Highest Level of Education"),
+            size = 28,
+            hjust = 0.5, vjust = 1,
+            x = 0.5,
+            family = "Futura Classic",
+            y = 0.98,
+            color = "gray20") +
+  draw_text("Graphic: @elidomx | #TidyTuesday | Data: Ask A Manager",
+            size = 6,
+            hjust = 0, vjust = 0,
+            x = 0.01, y = 0.01,
+            color = "gray30",
+            family = "Futura Classic") +
+  theme(plot.background = element_rect(fill = "#f0f0ff"),
+        panel.background = element_rect(fill = "#f0f0ff"))
+
+final_plot
+```
+
+```{r}
+ggsave(here("week_21", "AskAManager.png"), final_plot, width = 49, height = 29, units = "cm")
+```
+
+
