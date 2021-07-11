@@ -1,0 +1,29 @@
+
+# Dunes
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+set.seed(42)
+x = rnorm(1000, 5, 2)
+y = seq(0, 10, by = 0.02)
+frame = expand.grid(x = x, y = y)
+ggplot(frame, aes(x = x + 0.4 * sin(y * 2),
+                  y = y + 1.5 * sin(x))) +
+  geom_point(alpha = 0.2, 
+             size = 0, 
+             color = "#a47c48") +
+  geom_jitter(aes(x = rnorm(length(frame$y) , 5, 1),
+                  y = rnorm(length(frame$y), 4.5, 2.3)),
+              color = "#064273",
+              alpha = 0.05,
+              size = 0) +
+  theme_void() +
+  theme(
+    panel.background = element_rect(fill = "black")
+  )
+```
+
