@@ -1,0 +1,175 @@
+
+# Olympics
+
+## Load data & libraries
+```{r}
+tuesdata <- tidytuesdayR::tt_load(2021, week = 31)
+
+olympics <- tuesdata$olympics
+```
+
+```{r}
+library(tidyverse)
+library(broom)
+library(cowplot)
+library(extrafont)
+library(here)
+
+theme_set(theme_light())
+```
+
+
+## See & Wrangle
+```{r}
+glimpse(olympics)
+
+mex_med <- olympics %>%
+  filter(team == "Mexico") %>%
+  group_by(year, medal) %>%
+  count() %>%
+  ungroup() %>%
+  filter(!is.na(medal)) %>%
+  mutate(medal = factor(medal, levels = c("Gold", "Silver", "Bronze")))
+
+colm_med <- olympics %>%
+  filter(team == "Colombia") %>%
+  group_by(year, medal) %>%
+  count() %>%
+  ungroup() %>%
+  filter(!is.na(medal)) %>%
+  mutate(medal = factor(medal, levels = c("Gold", "Silver", "Bronze")))
+
+cuba_med <- olympics %>%
+  filter(team == "Cuba") %>%
+  group_by(year, medal) %>%
+  count() %>%
+  ungroup() %>%
+  filter(!is.na(medal)) %>%
+  mutate(medal = factor(medal, levels = c("Gold", "Silver", "Bronze")))
+
+
+total_meds <- olympics %>%
+  filter(team == "Mexico") %>%
+  group_by(medal) %>%
+  count() %>%
+  filter(!is.na(medal)) %>%
+  mutate(medal = factor(medal, levels = c("Gold", "Silver", "Bronze")))
+
+# # correct mistakes
+which(mex_med$n == 16)
+
+mex_med$n[33] <- 1
+mex_med$n[2] <- 3
+
+which(cuba_med$n == 22)
+cuba_med$n[23] <- 11
+cuba_med$n[22] <- 11
+cuba_med$n[19] <- 9
+cuba_med$n[18] <- 8
+cuba_med$n[25] <- 9
+cuba_med$n[24] <- 11
+cuba_med$n[29] <- 10
+cuba_med$n[27] <- 17
+
+```
+
+
+
+
+## Viz
+
+### Graph function
+```{r}
+dark_matter <- theme(
+    legend.position = "none",
+    plot.background = element_rect(fill = "black", linetype = 0),
+    panel.background = element_rect(fill = "black", linetype = 0),
+    axis.text = element_text(color = "white", size = 20, family = "Chilanka"),
+    panel.border = element_blank(),
+    axis.text.y = element_blank()
+  )
+
+dark_matter_2 <- theme(
+    legend.position = "none",
+    plot.background = element_rect(fill = "black", linetype = 0),
+    panel.background = element_rect(fill = "black", linetype = 0),
+    axis.text = element_text(color = "white", size = 14, family = "Futura"),
+    panel.border = element_blank(),
+    axis.text.y = element_blank(),
+    axis.text.x = element_blank()
+  )
+
+medal_plot <- function(df, seed = 999, display_years = TRUE){
+  
+  set.seed(seed)
+  
+  df_2 <- df %>%
+  mutate(y_pos = rnorm(length(df$n)))
+  
+  df_3 <- df_2 %>%
+    mutate(x_pos = year + ((rnorm(length(df_2$n)) * 2) -1)*.3)
+  
+  p1 <- df_3 %>%
+  filter(year >= 1996) %>%
+  ggplot(aes(x = x_pos, y = y_pos, color = medal)) +
+  geom_point(aes(size = n),
+             alpha = runif(1) + 0.3) +
+  geom_text(aes(label = n),
+            family = "slayer") +
+  scale_colour_manual(values = c("#FEE101", "#A7A7AD", "#A77044")) + 
+  labs(x = "", y = "") +
+  scale_size_continuous(range = c(30, 55)) +
+  scale_y_continuous(limits = c(-3, 3)) +
+  scale_x_continuous(breaks = seq(1996, 2016, by = 4),
+                     limits = c(1995, 2017)) +
+  theme_void() +
+  {if(display_years == TRUE) dark_matter} +
+  {if(display_years == FALSE) dark_matter_2}
+  
+  
+  return(p1)
+}
+```
+
+```{r}
+mexico <- medal_plot(mex_med, 9090909, display_years = FALSE) # Mexico
+colombia <- medal_plot(colm_med, 1000, FALSE) # Colombia
+cuba <- medal_plot(cuba_med, 2) # Cuba
+```
+
+```{r}
+grid <- plot_grid(mexico, colombia, cuba, nrow = 3)
+```
+
+
+```{r}
+final_plot <- ggdraw() +
+  draw_plot(grid, height = 0.95) +
+  draw_text("Mexico", color = "#007542", 
+            x = 0.06, y = 0.91,
+            family = "Chilanka",
+            size   =  30) +
+  draw_text("Colombia", color = "#fcd116", 
+            x = 0.06, y = 0.58,
+            family = "Chilanka",
+            size   =  30) +
+  draw_text("Cuba", color = "#CF142B", 
+            x = 0.06, y = 0.28,
+            family = "Chilanka",
+            size   =  30) +
+  draw_text("Medals won by Mexico, Colombia and Cuba in 20 years of Olympiads", color = "white", 
+            x = 0.5, y = 0.98,
+            family = "Chilanka",
+            size   =  32) +
+  theme(
+    plot.background = element_rect(fill = "black", linetype = 0)
+  )
+
+final_plot
+```
+
+## Save
+```{r}
+ggsave(here("week_31", "Olympiads.png"), final_plot, width = 49, height = 40, units = "cm")
+```
+
