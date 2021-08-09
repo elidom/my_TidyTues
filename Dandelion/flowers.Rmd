@@ -114,14 +114,15 @@ bg <- ggplot(grid, aes(x, y, fill = noise)) + geom_raster() +
     panel.grid = element_blank(),
     plot.background = element_rect(fill = "#000f18"),
     panel.background = element_rect(fill = "#000f18"),
-    legend.position = "none"
+    legend.position = "none",
+    panel.border = element_blank()
 )
 
 ```
 
 lienzo
 ```{r}
-ggdraw() +
+dandelion <- ggdraw() +
   draw_plot(bg) +
   draw_plot(p) +
   draw_plot(p2, width = 0.23, height = 0.23, x = 0.6, y = 0.8) +
@@ -129,8 +130,16 @@ ggdraw() +
   draw_plot(p4, width = 0.12, height = 0.12, x = 0.86, y = 0.32) +
   draw_plot(p5, width = 0.2, height = 0.2, x = 0.65, y = 0.5) +
   draw_plot(p6, width = 0.3, height = 0.3, x = 0.28, y = 0.65) +
-  draw_plot(p7, width = 0.25, height = 0.25, x = 0.64, y = 0.05)
+  draw_plot(p7, width = 0.25, height = 0.25, x = 0.64, y = 0.05) +
+  theme(
+    plot.background = element_rect(fill = "#000f18")
+  )
 
+dandelion
 ```
 
 guardar
+```{r}
+ggsave("Dandelion.png", dandelion, width = 30, height = 25, units = "cm")
+```
+
