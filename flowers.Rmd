@@ -1,0 +1,136 @@
+
+# Flowers
+
+## 1. Dandelion
+
+```{r}
+library(tidyverse)
+library(cowplot)
+library(ambient)
+```
+
+Dandilion
+```{r}
+# Define the number of points
+points  <- 9000
+
+# Define the Golden Angle
+angle <- pi * (3 - sqrt(5))
+
+t <- (1:points) * angle
+x <- sin(t)
+y <-cos(t)
+df <- data.frame(t, x, y)
+
+
+p <- ggplot(df, aes(x*t, y*t)) + 
+  geom_point(color = "white", shape = '*', alpha = 0.4, size = 10) +
+  scale_x_continuous(limits = c(-11000, 40000)) +
+  scale_y_continuous(limits = c(-15000, 40000)) +
+  theme(
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "transparent", linetype = 0),
+    panel.background = element_rect(fill = "transparent"),
+    legend.position = "none"
+)
+
+```
+
+pelusa 1
+```{r}
+points <- 400
+angle <- 2.99
+t <- (1:points) * angle
+x <- sin(t)
+y <-cos(t)
+df <- data.frame(t, x, y)
+
+p2 <- ggplot(df, aes(x*t, y*t)) + 
+  geom_point(color = "#F5A9CB", shape = '*', alpha = 0.4, size = 5) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "transparent", linetype = 0),
+    panel.background = element_rect(fill = "transparent"),
+    legend.position = "none"
+)
+```
+
+función
+```{r}
+pelusas = function(points, angle, color = "white", shape = 16, alpha = 0.5, size = 1){
+t <- (1:points) * angle
+x <- sin(t)
+y <-cos(t)
+df <- data.frame(t, x, y)
+
+plot <- ggplot(df, aes(x*t, y*t)) + 
+  geom_point(color = color, shape = shape, alpha = alpha, size = size) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "transparent", linetype = 0),
+    panel.background = element_rect(fill = "transparent"),
+    legend.position = "none"
+) 
+
+return(plot)
+  
+}
+```
+
+```{r}
+(p3 <- pelusas(1000, 4.20, "#a9e185", alpha = 0.3, size = 0.6))
+(p4 <- pelusas(400, pi*2/21, "#f4df62", size = 0.2))
+(p5 <- pelusas(2000, 21*pi^2, "#e75555", size = 2, alpha = 0.1, shape = 1))
+(p6 <- pelusas(9000, 3*exp(140), "#9CCFE7", size = 0.2, alpha = 0.2, shape = 16)) 
+(p7 <- pelusas(300, 0.1, "#977fd7", size = 10, alpha = 0.2, shape = 1))
+```
+
+fondo
+```{r}
+
+grid <- long_grid(x = seq(0, 1, length.out = 1000),
+                  y = seq(0, 1, length.out = 1000))
+
+grid <- grid %>% 
+  mutate(
+    noise = fracture(gen_perlin, fbm, octaves = 4, x = x, y = y, freq_init = 5)
+  ) 
+
+
+bg <- ggplot(grid, aes(x, y, fill = noise)) + geom_raster() +
+  scale_fill_gradient(high = "#000f18", low = "#001f30") +
+    theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#000f18"),
+    panel.background = element_rect(fill = "#000f18"),
+    legend.position = "none"
+)
+
+```
+
+lienzo
+```{r}
+ggdraw() +
+  draw_plot(bg) +
+  draw_plot(p) +
+  draw_plot(p2, width = 0.23, height = 0.23, x = 0.6, y = 0.8) +
+  draw_plot(p3, width = 0.1, height = 0.1, x = 0.9, y = 0.65) +
+  draw_plot(p4, width = 0.12, height = 0.12, x = 0.86, y = 0.32) +
+  draw_plot(p5, width = 0.2, height = 0.2, x = 0.65, y = 0.5) +
+  draw_plot(p6, width = 0.3, height = 0.3, x = 0.28, y = 0.65) +
+  draw_plot(p7, width = 0.25, height = 0.25, x = 0.64, y = 0.05)
+
+```
+
+guardar
