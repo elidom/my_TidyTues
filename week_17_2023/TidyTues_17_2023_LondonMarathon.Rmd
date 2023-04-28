@@ -1,0 +1,104 @@
+# Tidy Tuesday 17, 2023
+
+## Libraries
+```{r}
+library(tidyverse)
+library(treemapify)
+library(wesanderson)
+library(janitor)
+library(cowplot)
+```
+
+
+## Load the data
+```{r}
+winners <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-04-25/winners.csv') %>% 
+  clean_names()
+london_marathon <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-04-25/london_marathon.csv')
+```
+
+## Glimpse at it
+```{r}
+glimpse(winners)
+
+glimpse(london_marathon)
+```
+
+## choose a color palette
+```{r}
+pal <- wes_palette("Darjeeling1", 4)
+```
+
+## Wrangling
+
+### Wrangling winners dataset
+```{r}
+winners_count <- winners %>% 
+  group_by(category, nationality) %>% 
+  count()
+```
+
+## Plotting
+
+### Create plot1
+```{r}
+plot_winners <- winners_count %>% 
+  ggplot(aes(area = n, fill = category, label = nationality, subgroup = category,
+             layout = "squarified")) +
+  geom_treemap(start = "topleft") +
+  # geom_treemap_subgroup_border(colour = "black") +
+  geom_treemap_text(colour = "white", place = "center", start = "topleft",
+                    grow = TRUE, family = "Proxima Nova") + 
+  geom_treemap_subgroup_text(place = "topleft", family = "Proxima Nova", fontface = "bold", 
+                             color = "black", alpha = 0.3, size = 15)  +
+  scale_fill_manual(values = pal) +
+  theme(legend.position = "none",
+        plot.background = element_rect(fill = "#F3D2AC"),
+        plot.margin = unit(c(0,0,0,0), "cm"))
+
+```
+
+### Create plot two
+```{r}
+plot_finishers <- london_marathon %>% 
+  filter(Year <= 2019) %>% 
+  ggplot(aes(x = Year, y = Finishers)) +
+  geom_segment(aes(xend = Year, y = 0, yend = Finishers), color = "#007300") +
+  geom_point(color = "#007300") +
+  geom_point(aes(y = Starters), color = "#ff5252") +
+  theme_classic() +
+  ylab("Finishers / Starters") +
+  coord_flip() +
+  theme(
+    plot.background = element_rect(fill = "#F3D2AC"),
+    panel.background = element_rect(fill = "#F3D2AC"),
+    plot.margin = unit(c(0,0,0,0), "px"),
+    axis.text = element_text(family = "Futura"),
+    axis.title = element_text(family = "Futura")
+  )
+
+```
+
+## Create final plot
+```{r}
+full_plot <- plot_grid(plot_winners, plot_finishers, nrow = 1, axis = "tb")
+
+labe1 <- "Kenyan athletes have been the most successful, \nwinning the men's race 14 times and the \nwomen's race 11 times. Ethiopian athletes have \nalso had success, with 6 wins in the men's race \nand 4 wins in the women's race."
+
+ggdraw() +
+  draw_label("The London Marathon's Results", size = 30, fontface = "bold", x = 0.013, y = 0.95, 
+             hjust = 0, fontfamily = "Futura") +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+  draw_plot(plot_winners, height = .9, width = .5) +
+  draw_plot(plot_finishers, height = .6, width = .5, x = .5) +
+  draw_label(labe1, size = 19, x = .75, y = .75, fontfamily = "futura", alpha = .6) +
+  draw_label("viz: @elidomx | #TidyTuesday", 
+             size = 9, x = .99, y = .992, fontfamily = "Times New Roman", alpha = .4,
+             hjust = 1) +
+  theme(
+    panel.background = element_rect(fill = "#F3D2AC"),
+    plot.background = element_blank()
+  ) 
+```
+
+
