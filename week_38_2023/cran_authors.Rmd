@@ -1,0 +1,213 @@
+
+
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+library(janitor)
+library(lubridate)
+library(cowplot)
+library(treemapify)
+library(extrafont)
+```
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load(2023, week = 38)
+
+cran_20230905 <- tuesdata$cran_20230905
+package_authors <- tuesdata$package_authors
+cran_graph_nodes <- tuesdata$cran_graph_nodes
+cran_graph_edges <- tuesdata$cran_graph_edges
+```
+
+Let's look at package publication through time -- the amount of packages published monthly (and yearly?)
+
+### Wrangle data
+```{r}
+# Date 	character 	the release date of the current version of the package
+
+month_vec <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+cran <- cran_20230905 %>% 
+  clean_names() %>% 
+  select(package, 
+         title, 
+         author, 
+         description, 
+         date, 
+         date_publication, 
+         published, 
+         version, 
+         license, 
+         language) %>% 
+  filter(!is.na(published)) %>% 
+  mutate(published = format(ymd(published), "%Y-%b-%d")) %>% 
+  separate(published, into = c("year", "month", "day"), remove = FALSE) %>% 
+  mutate(year = as.integer(year),
+         month = factor(month),
+         day = as.integer(day)) %>% 
+  distinct(package, .keep_all = TRUE)
+
+
+year_cran <- cran %>% 
+  count(year)
+
+month_cran <- cran %>% 
+  count(year, month) %>%
+  group_by(month) %>% 
+  summarise(mean = mean(n), sd = sd(n), median = median(n), iqr = IQR(n)) %>% 
+  mutate(month = factor(month, levels = month_vec))
+
+ym_cran <- cran %>% 
+  count(year, month)
+```
+
+Lollipop charts
+```{r}
+pop_yearly <- year_cran %>% 
+  ggplot(aes(x = year, y = n)) +
+  geom_point(size = 7, 
+             color = "#fcbf45") +
+  geom_segment(aes(x = year,  xend = year, 
+                   y = 0, yend = n), 
+               color = "#fcbf45", 
+               size = 2) +
+  labs(x = "", y = "Number of packages published") +
+  theme(
+    panel.background = element_rect(fill = "#75AADB"),
+    plot.background = element_rect(fill = "#75AADB", color = "#75AADB"),
+    axis.text = element_text(color = "black", size = 12),
+    axis.title = element_text(color = "white", 
+                              size = 18,
+                              family = "CM Typewriter Greek"),
+    panel.grid = element_line(color = "white"),
+    axis.line = element_line(color = "white")
+    )
+
+
+rad_months <- month_cran %>% 
+  ggplot(aes(x = month, y = median)) + 
+  geom_point(size = 7, color = "#843511") +
+  geom_segment(aes(x = month, xend = month, 
+                   y = 0, yend = median),
+               color = "#843511", 
+               size = 2) +
+  coord_polar() +
+  labs(x = "", y = "Median number of packages published") +
+  theme(
+    panel.background = element_rect(fill = "#75AADB"),
+    plot.background = element_rect(fill = "#75AADB", color = "#75AADB"),
+    axis.text = element_text(color = "black", size = 12),
+    axis.title = element_text(color = "white",
+                              size = 18,
+                              family = "CM Typewriter Greek"),
+    panel.grid = element_line(color = "white"),
+    axis.line = element_line(color = "white")
+    )
+  
+
+cran %>% 
+  filter(year == 2015) %>% 
+  count(month) %>%
+  mutate(month = factor(month, levels = month_vec)) %>% 
+  ggplot(aes(x = month, y = n)) +
+  geom_point(size = 4) +
+  geom_segment(aes(x = month, xend = month, y = 0, yend = n)) +
+  coord_polar()
+  
+```
+
+treemaps
+```{r}
+tree_15 <- cran %>% 
+  filter(year == 2015) %>% 
+  count(month) %>%
+  mutate(month = factor(month, levels = month_vec)) %>% 
+  ggplot(aes(area = n, fill = n, label = month, layout = "squarified")) +
+  geom_treemap(start = "topleft") +
+  geom_treemap_text(colour = "#4D4D4D", 
+                    place = "center", 
+                    start = "topleft",
+                    grow = T, 
+                    family = "Proxima Nova") +
+  labs(fill = "") +
+  scale_fill_gradient(low = "#db75aa", high = "#aadb75") +
+  theme(
+    legend.position = "bottom",
+    axis.ticks = element_blank(),
+    legend.key.width = unit(2.5, "cm"),
+    panel.background = element_rect(fill = "#75AADB"),
+    plot.background = element_rect(fill = "#75AADB", color = "#75AADB"),
+    legend.background = element_rect(fill = "#75AADB"),
+    plot.margin = unit(c(0,0,0,0), "cm")
+        ) 
+```
+
+
+```{r}
+tree_23 <- cran %>% 
+  filter(year == 2023,
+         month != "Sep") %>%
+  count(month) %>%
+  mutate(month = factor(month, levels = month_vec)) %>% 
+  ggplot(aes(area = n, fill = n, label = month, layout = "squarified")) +
+  geom_treemap(start = "topleft") +
+  geom_treemap_text(colour = "#4D4D4D", 
+                    place = "center", 
+                    start = "topleft",
+                    grow = T, 
+                    family = "Proxima Nova") +
+  labs(fill = "") +
+  scale_fill_gradient(low = "#db75aa", high = "#aadb75") +
+  theme(
+    legend.position = "bottom",
+    axis.ticks = element_blank(),
+    legend.key.width = unit(2.5, "cm"),
+    panel.background = element_rect(fill = "#75AADB"),
+    plot.background = element_rect(fill = "#75AADB", color = "#75AADB"),
+    legend.background = element_rect(fill = "#75AADB"),
+    legend.text = element_text(color = "black")
+        )
+```
+
+cowplot
+```{r}
+trees <- plot_grid(tree_15, tree_23, ncol = 2)
+
+trees_wTitle <- ggdraw() +
+  draw_plot(trees, height = .9) +
+  draw_text("There's a marked anomaly in the monthly distribution of package publications for 2015 and 2023:", 
+            x = 0.01, 
+            y = 0.95, 
+            size = 20, 
+            hjust = 0, 
+            color = "white", 
+            family = "CM Typewriter Greek")
+
+lolipops <- plot_grid(pop_yearly, rad_months, nrow = 1, rel_widths = c(1)) 
+
+
+all_plots <- plot_grid(lolipops, trees_wTitle, nrow = 2, rel_heights = c(1,.7))
+
+
+ggdraw() +
+  draw_plot(all_plots, height = .9) +
+  draw_text("Yearly and monthly distributions of CRAN package publications", 
+            y = .95, 
+            size = 38,
+            color = "white", 
+            family = "CM Typewriter Greek") +
+  theme(
+    panel.background = element_rect(fill = "#75AADB"),
+    plot.background = element_blank()
+    ) +
+  draw_text("2015", x = .07, y = .025, hjust = 0, vjust = 0, 
+            family = "CM Typewriter Greek", size = 24, color = "white") +
+  draw_text("2023", x = .93, y = .025, hjust = 1, vjust = 0, 
+            family = "CM Typewriter Greek", size = 24, color = "white")
+
+# ggsave(filename = 'cran.png',  width = 1000, height = 600, units = "px")
+```
+
+
+
+
